@@ -187,9 +187,10 @@ function getCurrentWeather() {
     const infoBoxData = lastGeneratedData.infoBox || committedTrackerData.infoBox || '';
     // Try to parse as JSON first (new format)
     try {
-        const parsed = typeof infoBoxData === 'string' ? JSON.parse(infoBoxData) : infoBoxData;
+        const parsed = typeof infoBoxData === 'string' ? repairJSON(infoBoxData) : infoBoxData;
         if (parsed && parsed.weather) {
-            // Return the forecast text from the weather object
+            // Handle flat string or nested object
+            if (typeof parsed.weather === 'string') return parsed.weather;
             return parsed.weather.forecast || parsed.weather.emoji || null;
         }
     } catch (e) {

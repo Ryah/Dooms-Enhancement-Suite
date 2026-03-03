@@ -80,7 +80,7 @@ export function buildInfoBoxJSONInstruction() {
     }
     if (widgets.weather?.enabled) {
         const keywordsHint = getWeatherKeywordsAsPromptString('en');
-        instruction += (hasFields ? ',\n' : '') + `  "weather": {"emoji": "Weather Emoji", "forecast": "Current weather conditions. ${keywordsHint}"}`;
+        instruction += (hasFields ? ',\n' : '') + `  "weather": {"emoji": "WeatherEmoji", "forecast": "SINGLE keyword only. ${keywordsHint}"}`;
         hasFields = true;
     }
     if (widgets.temperature?.enabled) {
