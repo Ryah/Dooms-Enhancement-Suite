@@ -428,6 +428,7 @@ export function renderLorebook() {
         html += `<span class="rpg-lb-campaign-stats">${activeInCampaign}/${books.length} active</span>`;
         const allBooksActive = books.length > 0 && activeInCampaign === books.length;
         html += `<div class="rpg-lb-toggle rpg-lb-campaign-toggle ${allBooksActive ? 'active' : ''}" data-type="campaign" data-campaign="${id}" title="Toggle all books in this library"></div>`;
+        html += `<button class="rpg-lb-campaign-delete" data-campaign="${id}" title="Delete library"><i class="fa-solid fa-trash"></i></button>`;
         html += `<i class="fa-solid fa-chevron-down rpg-lb-campaign-chevron"></i>`;
         html += '</div>';
         html += `<div class="rpg-lb-campaign-body" ${isCollapsed ? 'style="display:none;"' : ''}>`;
@@ -724,10 +725,21 @@ export function initLorebookEventDelegation() {
         }
     });
 
+    // ── Campaign delete ─────────────────────────────────────────────────────
+    $modal.on('click', '.rpg-lb-campaign-delete', function (e) {
+        e.stopPropagation();
+        const campaignId = $(this).data('campaign');
+        const campaign = (extensionSettings.lorebook?.campaigns || {})[campaignId];
+        if (!campaign) return;
+        if (!confirm(`Delete library "${campaign.name}"? Books inside will become unfiled.`)) return;
+        campaignManager.deleteCampaign(campaignId);
+        renderLorebook();
+    });
+
     // ── Campaign header collapse/expand ─────────────────────────────────────
     $modal.on('click', '.rpg-lb-campaign-header', function (e) {
-        // Don't collapse/expand when clicking the campaign toggle or icon picker
-        if ($(e.target).closest('.rpg-lb-campaign-toggle, .rpg-lb-icon-picker').length) return;
+        // Don't collapse/expand when clicking the campaign toggle, delete button, or icon picker
+        if ($(e.target).closest('.rpg-lb-campaign-toggle, .rpg-lb-campaign-delete, .rpg-lb-icon-picker').length) return;
         const id = $(this).data('campaign');
         if (!id || id === 'unfiled') {
             // Unfiled group just toggles the body
