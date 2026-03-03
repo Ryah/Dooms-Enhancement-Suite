@@ -59,6 +59,25 @@ A full-featured lorebook manager that replaces SillyTavern's native World Info i
 - Token count estimates
 <img width="1557" height="2380" alt="image" src="https://github.com/user-attachments/assets/cad2d576-480e-446e-8d3f-bc1abd1e96b4" />
 
+### Doom Counter (Plot Twist Generator)
+A tension-driven plot twist system that keeps your story from stagnating. The AI rates each scene's tension on a 1–10 scale behind the scenes. When things stay too calm for too long, a countdown activates — and when it hits zero, you're presented with a set of AI-generated plot twist cards to choose from. Pick one and it gets woven into the next response.
+
+**How it works:**
+- The AI silently reports a tension score (1–10) with every response
+- Low-tension responses (≤ ceiling, default 4) build up a streak counter
+- Once the streak hits the threshold (default 5), a visible countdown begins
+- Lower tension = faster countdown (tension 1 drops by 3, tension 2 by 2)
+- At zero, a modal appears with twist options generated from your current scene context
+- Select a twist and it's injected into the next AI generation, then counters reset
+
+**Configurable settings:**
+- **Low Tension Ceiling** (2–6) — what counts as "too calm"
+- **Low Tension Threshold** (3–10) — how many calm responses before countdown starts
+- **Countdown Length** (1–8) — starting countdown value
+- **Twist Choices** (2–6) — number of twist options generated
+- **Debug mode** — shows live tension/streak/countdown in scene headers
+- **Trigger Now** button for manual activation
+
 ### Quest Tracking
 Track a main quest and multiple optional side quests. Quests appear in scene headers and are included in the AI's generation context. All quests are editable inline with lock support.
 
