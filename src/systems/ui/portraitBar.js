@@ -619,31 +619,33 @@ export function resolvePortrait(name) {
     }
 
     // 2. SillyTavern character card avatars (group members first, then all)
-    try {
-        if (selected_group) {
-            const groupMembers = getGroupMembers(selected_group);
-            if (groupMembers?.length) {
-                const match = groupMembers.find(m => m?.name && namesMatch(m.name, name));
+    if (extensionSettings.portraitAutoImport !== false) {
+        try {
+            if (selected_group) {
+                const groupMembers = getGroupMembers(selected_group);
+                if (groupMembers?.length) {
+                    const match = groupMembers.find(m => m?.name && namesMatch(m.name, name));
+                    if (match?.avatar && match.avatar !== 'none') {
+                        const url = getSafeThumbnailUrl('avatar', match.avatar);
+                        if (url) return url;
+                    }
+                }
+            }
+            if (characters?.length) {
+                const match = characters.find(c => c?.name && namesMatch(c.name, name));
                 if (match?.avatar && match.avatar !== 'none') {
                     const url = getSafeThumbnailUrl('avatar', match.avatar);
                     if (url) return url;
                 }
             }
-        }
-        if (characters?.length) {
-            const match = characters.find(c => c?.name && namesMatch(c.name, name));
-            if (match?.avatar && match.avatar !== 'none') {
-                const url = getSafeThumbnailUrl('avatar', match.avatar);
+            if (this_chid !== undefined && characters[this_chid]?.name &&
+                namesMatch(characters[this_chid].name, name)) {
+                const url = getSafeThumbnailUrl('avatar', characters[this_chid].avatar);
                 if (url) return url;
             }
+        } catch (e) {
+            console.warn('[Dooms Portrait Bar] Character card avatar lookup failed:', e.message);
         }
-        if (this_chid !== undefined && characters[this_chid]?.name &&
-            namesMatch(characters[this_chid].name, name)) {
-            const url = getSafeThumbnailUrl('avatar', characters[this_chid].avatar);
-            if (url) return url;
-        }
-    } catch (e) {
-        console.warn('[Dooms Portrait Bar] Character card avatar lookup failed:', e.message);
     }
 
     // 3. Check file-based portraits/ folder

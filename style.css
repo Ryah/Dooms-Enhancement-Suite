@@ -14410,6 +14410,20 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     transform: scale(0.95);
 }
 
+/* ── Reasoning / Thinking Panel TTS button ── */
+.dooms-reasoning-tts {
+    cursor: pointer;
+    transition: opacity 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.dooms-reasoning-tts:hover {
+    opacity: 1 !important;
+    color: var(--rpg-highlight, #e94560);
+    transform: scale(1.15);
+}
+.dooms-reasoning-tts:active {
+    transform: scale(0.95);
+}
+
 .dooms-bubble-header {
     display: flex;
     align-items: baseline;

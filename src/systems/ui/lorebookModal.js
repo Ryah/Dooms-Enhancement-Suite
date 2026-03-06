@@ -5,6 +5,7 @@
  */
 import { extensionSettings } from '../../core/state.js';
 import { renderLorebook } from '../rendering/lorebook.js';
+import { clearWICache } from '../lorebook/lorebookAPI.js';
 
 /**
  * LorebookModal - Manages the lorebook manager modal popup
@@ -41,6 +42,9 @@ export class LorebookModal {
 
         // Focus the close button
         this.modal.querySelector('.rpg-lb-close')?.focus();
+
+        // Clear cached WI data so entries created outside the modal are picked up
+        clearWICache();
 
         // Render lorebook content
         renderLorebook();

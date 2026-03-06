@@ -114,11 +114,12 @@ let searchDebounceTimer = null;
  *
  * @param {string} worldName - WI filename
  * @param {HTMLElement} container - The `.rpg-lb-lore-entries` element
+ * @param {Object|null} [preloadedData=null] - Pre-loaded WI data to use instead of cache/disk
  */
-async function renderEntriesForBook(worldName, container) {
+async function renderEntriesForBook(worldName, container, preloadedData = null) {
     container.innerHTML = '<div class="rpg-lb-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading entries...</div>';
 
-    const data = await lorebookAPI.loadWorldData(worldName);
+    const data = preloadedData || await lorebookAPI.loadWorldData(worldName);
     if (!data) {
         container.innerHTML = '<div class="rpg-lb-loading">Failed to load world data.</div>';
         return;
@@ -1124,13 +1125,18 @@ export function initLorebookEventDelegation() {
         const data = await lorebookAPI.loadWorldData(worldName);
         if (!data) return;
 
-        lorebookAPI.createEntry(worldName, data);
-        await lorebookAPI.saveWorldData(worldName, data);
+        const newEntry = lorebookAPI.createEntry(worldName, data);
+        if (!newEntry) return;
 
-        // Re-render entries for this book
+        // Save in background — don't let save errors block the UI re-render
+        lorebookAPI.saveWorldData(worldName, data).catch(err =>
+            console.error('[DES] Failed to save after creating entry:', err),
+        );
+
+        // Re-render entries using the in-memory data (already has the new entry)
         const $entries = $(this).closest('.rpg-lb-lore-entries');
         if ($entries.length) {
-            await renderEntriesForBook(worldName, $entries[0]);
+            await renderEntriesForBook(worldName, $entries[0], data);
         }
     });
 

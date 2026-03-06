@@ -787,4 +787,60 @@ export function initBubbleTtsHandlers() {
             toastr.info('TTS is not available. Make sure a TTS extension is enabled.', "Doom's Tracker");
         }
     });
+
+    // ── Reasoning / thinking panel TTS button ──
+    // Reads the AI's reasoning/thinking text aloud.
+    $(document).on('click', '.dooms-reasoning-tts', async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const $details = $(this).closest('.mes_reasoning_details');
+        if (!$details.length) return;
+
+        const text = $details.find('.mes_reasoning').text().trim();
+        if (!text) return;
+
+        const mesEl = $(this).closest('.mes')[0];
+        if (mesEl) {
+            document.querySelectorAll('#chat .mes.dooms-bubble-tts-speaking').forEach(el => {
+                el.classList.remove('dooms-bubble-tts-speaking');
+                el.classList.remove('tts-speaking');
+            });
+            mesEl.classList.add('tts-speaking');
+            mesEl.classList.add('dooms-bubble-tts-speaking');
+        }
+
+        try {
+            await executeSlashCommandsOnChatInput(`/speak ${text}`, { quiet: true });
+        } catch (err) {
+            console.error('[Dooms Tracker] Reasoning TTS failed:', err);
+            toastr.info('TTS is not available. Make sure a TTS extension is enabled.', "Doom's Tracker");
+        }
+    });
+}
+
+/**
+ * Injects a TTS button into reasoning/thinking panel action bars.
+ * Safe to call multiple times — skips panels that already have the button.
+ *
+ * @param {HTMLElement|Document} [scope=document] - Scope to search within (a .mes element or document)
+ */
+export function injectReasoningTtsButtons(scope = document) {
+    const actionBars = scope.querySelectorAll('.mes_reasoning_actions');
+    for (const bar of actionBars) {
+        // Skip if already injected
+        if (bar.querySelector('.dooms-reasoning-tts')) continue;
+
+        const btn = document.createElement('div');
+        btn.className = 'dooms-reasoning-tts mes_button fa-solid fa-bullhorn';
+        btn.title = 'Read thinking aloud';
+
+        // Insert before the edit (pencil) button so order is: … copy → tts → edit
+        const editBtn = bar.querySelector('.mes_reasoning_edit');
+        if (editBtn) {
+            bar.insertBefore(btn, editBtn);
+        } else {
+            bar.appendChild(btn);
+        }
+    }
 }

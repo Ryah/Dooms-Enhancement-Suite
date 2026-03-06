@@ -98,7 +98,8 @@ import {
     revertLastMessageBubbles,
     onChatBubbleModeChanged,
     applyChatBubbleSettings,
-    initBubbleTtsHandlers
+    initBubbleTtsHandlers,
+    injectReasoningTtsButtons
 } from './src/systems/rendering/chatBubbles.js';
 // infoPanel.js removed — banner/hud/ticker are now layout modes in sceneHeaders.js
 import {
@@ -384,6 +385,7 @@ async function initUI() {
     $('#rpg-pb-show-header').on('change', function() { _pbSettings().showHeader = $(this).prop('checked'); _savePb(); });
     $('#rpg-pb-show-absent').on('change', function() { _pbSettings().showAbsentCharacters = $(this).prop('checked'); _savePb(); updatePortraitBar(); });
     $('#rpg-pb-show-arrows').on('change', function() { _pbSettings().showScrollArrows = $(this).prop('checked'); _savePb(); });
+    $('#rpg-pb-auto-import').on('change', function() { extensionSettings.portraitAutoImport = $(this).prop('checked'); saveSettings(); });
 
     // Card size sliders
     $('#rpg-pb-card-width').on('input', function() {
@@ -1220,6 +1222,7 @@ async function initUI() {
     $('#rpg-pb-show-header').prop('checked', pb.showHeader !== false);
     $('#rpg-pb-show-absent').prop('checked', pb.showAbsentCharacters !== false);
     $('#rpg-pb-show-arrows').prop('checked', pb.showScrollArrows !== false);
+    $('#rpg-pb-auto-import').prop('checked', extensionSettings.portraitAutoImport !== false);
     $('#rpg-pb-card-width').val(pb.cardWidth ?? 110);
     $('#rpg-pb-card-width-value').text((pb.cardWidth ?? 110) + 'px');
     $('#rpg-pb-card-height').val(pb.cardHeight ?? 150);
@@ -1680,9 +1683,15 @@ jQuery(async () => {
             // ── Chat Bubbles: apply per-character bubbles to messages ──
             eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (messageId) => {
                 if (!extensionSettings.enabled) return;
+                const messageElement = document.querySelector(`#chat .mes[mesid="${messageId}"]`);
+
+                // Inject reasoning TTS button into the thinking panel
+                if (messageElement) {
+                    injectReasoningTtsButtons(messageElement);
+                }
+
                 // Apply chat bubbles if active
                 if (extensionSettings.chatBubbleMode && extensionSettings.chatBubbleMode !== 'off') {
-                    const messageElement = document.querySelector(`#chat .mes[mesid="${messageId}"]`);
                     if (messageElement) {
                         const mesText = messageElement.querySelector('.mes_text');
                         if (mesText) {
@@ -1716,6 +1725,8 @@ jQuery(async () => {
                     // Delay to let SillyTavern finish rendering all messages
                     setTimeout(() => applyAllChatBubbles(), 150);
                 }
+                // Inject reasoning TTS buttons into all messages
+                setTimeout(() => injectReasoningTtsButtons(), 150);
                 // Scene tracker re-render is handled by onCharacterChanged via CHAT_CHANGED
             });
             // TTS Highlight: clear all highlights when switching chats

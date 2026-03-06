@@ -294,6 +294,8 @@ export let extensionSettings = {
         historyDepth: 8, // Number of recent messages to include in combat initialization
         autoSaveLogs: false // Save detailed combat logs to file
     },
+    // Portrait auto-import: match NPC names to SillyTavern character card avatars
+    portraitAutoImport: true,
     // Auto avatar generation settings
     autoGenerateAvatars: false, // Master toggle for auto-generating avatars
     avatarLLMCustomInstruction: '', // Custom instruction for LLM prompt generation
