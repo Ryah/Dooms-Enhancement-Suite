@@ -256,6 +256,7 @@ export async function updateRPGData(renderInfoBox, renderThoughts) {
     }
     const isExternalMode = extensionSettings.generationMode === 'external';
     let originalProfileName = null;
+    let originalPresetName = null;
     let profileSwitched = false;
     try {
         setIsGenerating(true);
@@ -270,7 +271,13 @@ export async function updateRPGData(renderInfoBox, renderThoughts) {
             if (isConnectionProfileAvailable(extensionSettings.connectionProfile)) {
                 originalProfileName = await getCurrentProfileName() || '<None>';
                 if (originalProfileName !== extensionSettings.connectionProfile) {
-                    console.log(`[Dooms Tracker] Switching to connection profile: ${extensionSettings.connectionProfile}`);
+                    // Save the current preset BEFORE switching profiles.
+                    // Connection profiles bundle their own preset, so switching
+                    // profiles changes the active preset as a side-effect.
+                    // We restore it in the finally block to avoid clobbering
+                    // the user's primary preset.
+                    originalPresetName = await getCurrentPresetName();
+                    console.log(`[Dooms Tracker] Switching to connection profile: ${extensionSettings.connectionProfile} (saving preset: ${originalPresetName})`);
                     const switched = await switchToProfile(extensionSettings.connectionProfile);
                     if (switched) {
                         profileSwitched = true;
@@ -379,7 +386,11 @@ export async function updateRPGData(renderInfoBox, renderThoughts) {
             toastr.error(error.message, "Doom's Character Tracker External API Error");
         }
     } finally {
-        // Restore connection profile if we switched
+        // Restore connection profile AND preset if we switched.
+        // Profiles bundle their own preset, so switching profiles changes
+        // the active preset as a side-effect.  We saved the user's original
+        // preset before the switch and restore it here so the user's primary
+        // Chat Completion preset isn't silently overwritten.
         if (profileSwitched) {
             try {
                 console.log(`[Dooms Tracker] Restoring connection profile: ${originalProfileName}`);
@@ -389,6 +400,13 @@ export async function updateRPGData(renderInfoBox, renderThoughts) {
                         `Failed to restore connection profile "${originalProfileName}". Please switch back manually.`,
                         "Doom's Tracker"
                     );
+                }
+                // Restore the chat completion preset that was active before
+                // the profile switch.  Without this the secondary profile's
+                // preset leaks into the primary profile.
+                if (originalPresetName) {
+                    console.log(`[Dooms Tracker] Restoring preset: ${originalPresetName}`);
+                    await switchToPreset(originalPresetName);
                 }
             } catch (restoreError) {
                 console.error('[Dooms Tracker] Failed to restore connection profile:', restoreError);
