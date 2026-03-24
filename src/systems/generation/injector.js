@@ -504,6 +504,12 @@ function onGenerateBeforeCombinePrompts(eventData) {
     if (!eventData || !Array.isArray(eventData.finalMesSend)) {
         return;
     }
+    // Skip when the tracker itself is generating (separate/external mode) —
+    // generateSeparateUpdatePrompt() builds its own context; injecting here
+    // would double-inject and corrupt the tracker prompt.
+    if (isGenerating) {
+        return;
+    }
     // Skip for OpenAI (uses chat completion)
     if (eventData.api === 'openai') {
         return;
@@ -532,6 +538,10 @@ function onGenerateAfterCombinePrompts(eventData) {
     if (eventData.dryRun) {
         return;
     }
+    // Skip when the tracker itself is generating (separate/external mode)
+    if (isGenerating) {
+        return;
+    }
     let didInjectHistory = false;
     // Inject historical context if available and not already done
     if (!historyInjectionDone && pendingContextMap.size > 0) {
@@ -556,6 +566,12 @@ function onChatCompletionPromptReady(eventData) {
         return;
     }
     if (eventData.dryRun) {
+        return;
+    }
+    // Skip when the tracker itself is generating (separate/external mode) —
+    // the tracker prompt built by generateSeparateUpdatePrompt() already
+    // includes its own historical context.  Injecting here would corrupt it.
+    if (isGenerating) {
         return;
     }
     // Inject historical context if we have pending context

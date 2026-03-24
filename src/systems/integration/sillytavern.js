@@ -86,8 +86,8 @@ export function onMessageSent() {
     // Note: FAB spinning is NOT shown for together mode since no extra API request is made
     // The RPG data comes embedded in the main response
     // FAB spinning is handled by apiClient.js for separate/external modes when updateRPGData() is called
-    // For separate mode with auto-update disabled, commit displayed tracker
-    if (extensionSettings.generationMode === 'separate' && !extensionSettings.autoUpdate) {
+    // For separate/external mode with auto-update disabled, commit displayed tracker
+    if ((extensionSettings.generationMode === 'separate' || extensionSettings.generationMode === 'external') && !extensionSettings.autoUpdate) {
         if (lastGeneratedData.quests || lastGeneratedData.infoBox || lastGeneratedData.characterThoughts) {
             committedTrackerData.quests = lastGeneratedData.quests;
             committedTrackerData.infoBox = lastGeneratedData.infoBox;
