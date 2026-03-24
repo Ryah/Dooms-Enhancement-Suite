@@ -40,21 +40,34 @@ body.dooms-vk-resizing #chat {
     }
 }
 
-/* Doom icon - inline SVG mask icon */
+/* Doom icon - full color logo */
 .doom-icon {
     display: inline-block;
-    width: 1em;
-    height: 1em;
-    vertical-align: -0.125em;
-    background-color: currentColor;
-    -webkit-mask-image: url('./icon.svg');
-    mask-image: url('./icon.svg');
-    -webkit-mask-size: contain;
-    mask-size: contain;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-position: center;
+    width: 2.5em;
+    height: 2.5em;
+    vertical-align: -0.6em;
+    background-image: url('./icon.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Smaller icon in the extension dropdown header */
+.inline-drawer-header .doom-icon {
+    width: 1.4em;
+    height: 1.4em;
+    vertical-align: middle;
+}
+
+.inline-drawer-header b {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
 }
 
 /* Ensure chat stays centered when panel is visible */
@@ -14362,20 +14375,27 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
 }
 
 .dooms-fab-btn {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--rpg-highlight, #e94560), #c73450);
+    width: 40px;
+    height: 40px;
+    border-radius: 0;
+    background: transparent;
     border: none;
     color: #fff;
-    font-size: 0.8em;
+    font-size: 1em;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(233, 69, 96, 0.35);
+    box-shadow: none;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-    opacity: 0.6;
+    opacity: 0.85;
+    overflow: visible;
+    padding: 0;
+}
+
+.dooms-fab-btn .doom-icon {
+    width: 40px;
+    height: 40px;
 }
 
 .dooms-fab-btn:hover {
