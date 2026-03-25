@@ -233,7 +233,7 @@ export async function importFullSheetFromMessage(messageId) {
         defaultName = parsed.characterName;
     }
     const name = await callGenericPopup(
-        `<h3>Import Character Sheet</h3><p>Enter the character name to assign this sheet to:</p>`,
+        `<h3>Import Character Sheet</h3><p>Enter the character name to assign this sheet to:</p><p style="font-size: 0.75em; opacity: 0.6; margin-top: 4px;">Name must match exactly as it appears in the Present Characters panel (case-sensitive).</p>`,
         POPUP_TYPE.INPUT,
         defaultName
     );
