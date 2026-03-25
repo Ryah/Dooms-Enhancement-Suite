@@ -644,11 +644,6 @@ async function initUI() {
         _syncOptionalField('weather', v);
         _saveSt();
     });
-    $('#rpg-st-show-transitions').on('change', function() {
-        _stSettings().showSceneTransitions = $(this).prop('checked');
-        _saveSt();
-    });
-
     // Layout
     $('#rpg-st-layout').on('change', function() {
         _stSettings().layout = $(this).val();
@@ -776,6 +771,27 @@ async function initUI() {
     });
 
     // ── Doom Counter customization ──
+    // ── Inline Banners ──
+    const _ibSettings = () => {
+        if (!extensionSettings.inlineBanners) extensionSettings.inlineBanners = {};
+        return extensionSettings.inlineBanners;
+    };
+
+    $('#rpg-ib-toggle').on('change', function () {
+        _ibSettings().enabled = $(this).prop('checked');
+        $('#rpg-ib-badge').text($(this).prop('checked') ? 'on' : 'off');
+        $('#rpg-ib-options').toggle($(this).prop('checked'));
+        saveSettings();
+        updateChatSceneHeaders();
+    });
+
+    $('#rpg-ib-style').on('change', function () {
+        _ibSettings().style = $(this).val();
+        saveSettings();
+        updateChatSceneHeaders();
+    });
+
+    // ── Doom Counter ──
     const _dcSettings = () => {
         if (!extensionSettings.doomCounter) extensionSettings.doomCounter = {};
         return extensionSettings.doomCounter;
@@ -1346,7 +1362,6 @@ async function initUI() {
     $('#rpg-st-show-conditions').prop('checked', st.showConditions === true);
     $('#rpg-st-show-terrain').prop('checked', st.showTerrain === true);
     $('#rpg-st-show-weather').prop('checked', st.showWeather === true);
-    $('#rpg-st-show-transitions').prop('checked', st.showSceneTransitions || false);
     $('#rpg-st-layout').val(st.layout || 'grid');
     $('#rpg-st-font-size').val(st.fontSize ?? 82);
     $('#rpg-st-font-size-value').text((st.fontSize ?? 82) + '%');
@@ -1440,6 +1455,13 @@ async function initUI() {
     // Bunny Mo Integration
     $('#rpg-toggle-bunny-mo').prop('checked', extensionSettings.bunnyMoIntegration || false);
     $('#rpg-bm-badge').text(extensionSettings.bunnyMoIntegration ? 'on' : 'off');
+
+    // Inline Banners
+    const ib = extensionSettings.inlineBanners || {};
+    $('#rpg-ib-toggle').prop('checked', ib.enabled || false);
+    $('#rpg-ib-badge').text(ib.enabled ? 'on' : 'off');
+    $('#rpg-ib-options').toggle(ib.enabled || false);
+    $('#rpg-ib-style').val(ib.style || 'cinematic');
 
     // Doom Counter
     const dc = extensionSettings.doomCounter || {};

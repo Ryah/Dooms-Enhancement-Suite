@@ -17335,42 +17335,93 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
 }
 
 /* ========================================
-   SCENE TRANSITION CARDS
+   SCENE TRANSITION CARDS (Inline Banners)
    ======================================== */
 
 .dooms-scene-transition {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 14px 24px;
-    margin: 4px auto;
-    max-width: 500px;
     text-align: center;
-    font-size: 0.9em;
-    color: var(--st-accent, #e94560);
-    opacity: 0.85;
     animation: dooms-fadein 0.35s ease both;
 }
 
 .dooms-scene-transition-location {
     font-weight: 600;
-    font-size: 1.1em;
+    color: var(--st-accent, #e94560);
     letter-spacing: 0.5px;
 }
 
 .dooms-scene-transition-time {
-    font-size: 0.85em;
     color: var(--st-label-color, #888);
 }
 
-.dooms-scene-transition::before,
-.dooms-scene-transition::after {
-    content: '';
-    flex: 1;
+/* ── Style: Cinematic Banner ── */
+.dooms-transition-cinematic {
+    width: 100%;
+    padding: 20px 32px;
+    margin: 12px 0;
+    background: rgba(10, 10, 30, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(var(--st-border-rgb, 233, 69, 96), 0.3);
+    border-bottom: 1px solid rgba(var(--st-border-rgb, 233, 69, 96), 0.3);
+}
+
+.dooms-transition-cinematic .dooms-scene-transition-location {
+    font-size: 1.2em;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px rgba(var(--st-border-rgb, 233, 69, 96), 0.3);
+}
+
+.dooms-transition-cinematic .dooms-scene-transition-time {
+    font-size: 0.8em;
+    margin-top: 6px;
+}
+
+/* ── Style: Minimal Centered ── */
+.dooms-transition-minimal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 0;
+    margin: 8px 0;
+}
+
+.dooms-transition-minimal .dooms-scene-transition-location {
+    font-size: 1em;
+}
+
+.dooms-transition-minimal .dooms-scene-transition-time {
+    font-size: 0.78em;
+}
+
+.dooms-transition-line {
+    width: 200px;
     height: 1px;
     background: linear-gradient(to right, transparent, var(--st-accent, #e94560), transparent);
     opacity: 0.3;
+}
+
+/* ── Style: Hybrid Pill ── */
+.dooms-transition-hybrid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 32px;
+    margin: 12px auto;
+    max-width: 420px;
+    background: rgba(10, 10, 30, 0.5);
+    border-radius: 20px;
+    border: 1px solid rgba(var(--st-border-rgb, 233, 69, 96), 0.15);
+}
+
+.dooms-transition-hybrid .dooms-scene-transition-location {
+    font-size: 1.05em;
+}
+
+.dooms-transition-hybrid .dooms-scene-transition-time {
+    font-size: 0.78em;
 }
 
 /* ========================================

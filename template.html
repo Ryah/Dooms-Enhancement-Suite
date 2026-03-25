@@ -671,16 +671,6 @@
                             <span class="rpg-toggle-slider"></span>
                         </label>
                     </div>
-                    <div class="rpg-setting-row">
-                        <div class="rpg-setting-label-group">
-                            <span class="rpg-setting-label">Scene Transitions</span>
-                            <span class="rpg-setting-hint">Show cinematic transition cards in the chat when the story moves to a new location or makes a time jump between messages</span>
-                        </div>
-                        <label class="rpg-toggle-switch">
-                            <input type="checkbox" id="rpg-st-show-transitions" />
-                            <span class="rpg-toggle-slider"></span>
-                        </label>
-                    </div>
                     <div class="rpg-subsection-label" style="margin-top: 8px;">Optional Fields</div>
                     <div class="rpg-setting-hint" style="margin-bottom: 6px;">⚠️ Enabling too many optional fields may reduce your AI's tracking reliability. Only enable what your roleplay needs.</div>
                     <div class="rpg-setting-row">
@@ -880,6 +870,43 @@
                             <input type="checkbox" id="rpg-toggle-bunny-mo" />
                             <span class="rpg-toggle-slider"></span>
                         </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════ INLINE BANNERS ═══════ -->
+            <div class="rpg-accordion-section" data-accordion="inline-banners">
+                <div class="rpg-accordion-header">
+                    <i class="fa-solid fa-film rpg-accordion-icon"></i>
+                    <span class="rpg-accordion-title">Inline Banners</span>
+                    <span class="rpg-accordion-badge" id="rpg-ib-badge">off</span>
+                    <i class="fa-solid fa-chevron-down rpg-accordion-chevron"></i>
+                </div>
+                <div class="rpg-accordion-body">
+                    <div class="rpg-setting-row">
+                        <div class="rpg-setting-label-group">
+                            <span class="rpg-setting-label">Enable Inline Banners</span>
+                            <span class="rpg-setting-hint">Show cinematic transition cards in the chat when the story moves to a new location or makes a time jump between messages. No API calls — reads existing tracker data.</span>
+                        </div>
+                        <label class="rpg-toggle-switch">
+                            <input type="checkbox" id="rpg-ib-toggle" />
+                            <span class="rpg-toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="rpg-ib-options">
+                        <div class="rpg-subsection-label">Style</div>
+                        <div class="rpg-setting-row">
+                            <div class="rpg-setting-label-group">
+                                <span class="rpg-setting-label">Banner Style</span>
+                                <span class="rpg-setting-hint">Choose how transition cards look between messages</span>
+                            </div>
+                            <select id="rpg-ib-style" class="rpg-accordion-select">
+                                <option value="cinematic">Cinematic (Full-Width Banner)</option>
+                                <option value="minimal">Minimal (Centered Lines)</option>
+                                <option value="hybrid">Hybrid (Rounded Pill)</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -354,12 +354,31 @@ function extractTimeString(infoBox) {
 }
 
 /**
+ * Builds the HTML for a transition card based on the selected style.
+ */
+function buildTransitionCard(style, location, time, locationChanged, timeChanged) {
+    const locHTML = locationChanged ? `<div class="dooms-scene-transition-location">${location}</div>` : '';
+    const timeHTML = timeChanged ? `<div class="dooms-scene-transition-time">${time}</div>` : '';
+
+    if (style === 'cinematic') {
+        return `<div class="dooms-scene-transition dooms-transition-cinematic">${locHTML}${timeHTML}</div>`;
+    } else if (style === 'minimal') {
+        return `<div class="dooms-scene-transition dooms-transition-minimal"><div class="dooms-transition-line"></div>${locHTML}${timeHTML}<div class="dooms-transition-line"></div></div>`;
+    } else {
+        // hybrid (pill)
+        return `<div class="dooms-scene-transition dooms-transition-hybrid">${locHTML}${timeHTML}</div>`;
+    }
+}
+
+/**
  * Injects cinematic transition cards between messages where the location or time changed.
  * Reads per-message tracker data from chat[].extra.dooms_tracker_swipes.
  */
 function injectSceneTransitions() {
-    const st = extensionSettings.sceneTracker || {};
-    if (!st.showSceneTransitions) return;
+    const ib = extensionSettings.inlineBanners || {};
+    if (!ib.enabled) return;
+
+    const style = ib.style || 'cinematic';
 
     // Remove old transition cards first (idempotent)
     $('.dooms-scene-transition').remove();
@@ -401,19 +420,7 @@ function injectSceneTransitions() {
             const timeChanged = curTime && prevTime && curTime !== prevTime;
 
             if (locationChanged || timeChanged) {
-                const parts = [];
-                if (locationChanged) {
-                    parts.push(`<span class="dooms-scene-transition-location">📍 ${curLocation}</span>`);
-                }
-                if (timeChanged && !locationChanged) {
-                    // Only show time alone if location didn't change (otherwise it's implied)
-                    parts.push(`<span class="dooms-scene-transition-time">🕐 ${curTime}</span>`);
-                } else if (timeChanged && locationChanged) {
-                    parts.push(`<span class="dooms-scene-transition-time">${curTime}</span>`);
-                }
-
-                if (parts.length > 0) {
-                    const cardHTML = `<div class="dooms-scene-transition">${parts.join('<br>')}</div>`;
+                const cardHTML = buildTransitionCard(style, curLocation, curTime, locationChanged, timeChanged);
                     $mes.before(cardHTML);
                 }
             }

@@ -74,7 +74,6 @@ export let extensionSettings = {
         showCharacters: true,
         showQuest: true,
         showRecentEvents: true,
-        showSceneTransitions: false, // Cinematic transition cards when location/time changes between messages
         showMoonPhase: false,
         showTension: false,
         showTimeSinceRest: false,
@@ -103,6 +102,11 @@ export let extensionSettings = {
         borderWidth: 3,
         // Theme integration
         themeControlled: false,
+    },
+    // Inline Banners — cinematic transition cards between messages
+    inlineBanners: {
+        enabled: false,                    // Master toggle
+        style: 'cinematic',               // 'cinematic' | 'minimal' | 'hybrid'
     },
     panelPosition: 'right', // 'left', 'right', or 'top'
     theme: 'default', // Theme: default, sci-fi, fantasy, cyberpunk, custom
