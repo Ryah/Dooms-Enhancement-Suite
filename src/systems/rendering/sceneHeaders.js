@@ -421,8 +421,7 @@ function injectSceneTransitions() {
 
             if (locationChanged || timeChanged) {
                 const cardHTML = buildTransitionCard(style, curLocation, curTime, locationChanged, timeChanged);
-                    $mes.before(cardHTML);
-                }
+                $mes.before(cardHTML);
             }
         }
 
