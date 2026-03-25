@@ -422,10 +422,17 @@ export function updateChatSceneHeaders() {
         }
     } else {
         // Classic layouts: grid, stacked, compact
+        // Insert inside .mes_block of the last assistant message so it
+        // aligns with inline thought bubbles (which live in .mes_text).
         const $target = findLastAssistantMessage();
         if (!$target) return;
         const headerHTML = createSceneHeaderHTML(sceneData);
-        $target.after(headerHTML);
+        const $mesBlock = $target.find('.mes_block');
+        if ($mesBlock.length) {
+            $mesBlock.append(headerHTML);
+        } else {
+            $target.after(headerHTML);
+        }
     }
 }
 
