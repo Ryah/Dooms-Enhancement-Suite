@@ -126,9 +126,9 @@ Captures every SillyTavern toast notification (API errors, system messages, warn
 Choose from pre-built themes (Default, Sci-Fi, Fantasy, Cyberpunk) or create your own with full color picker controls for background, accent, text, highlight, stat bars, and per-element opacity.
 
 ### Settings Panel
-<img width="1380" height="377" alt="image" src="https://github.com/user-attachments/assets/e27027e6-a4bb-42a4-8da4-e206a49a6427" />
+<img width="813" height="252" alt="image" src="https://github.com/user-attachments/assets/8449e4f8-edd6-49d2-b5a9-22311637adae" />
 
-<img width="1182" height="1474" alt="image" src="https://github.com/user-attachments/assets/5042424e-10a0-4644-af0b-ab0fc93b9fee" />
+<img width="601" height="792" alt="image" src="https://github.com/user-attachments/assets/faf752a6-df04-4b79-b94c-3bc1478c7037" />
 
 The settings panel (accessed via the **D** icon) is organized into sections:
 1. **Display & Features** — Toggle every feature on/off individually
