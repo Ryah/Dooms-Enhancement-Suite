@@ -221,8 +221,11 @@ export async function importFullSheetFromMessage(messageId) {
         return;
     }
 
-    // Pre-fill with detected name or ask user
-    const defaultName = parsed.characterName || message.name || '';
+    // Pre-fill with detected name — only use short, clean names (no narrative text)
+    let defaultName = '';
+    if (parsed.characterName && parsed.characterName.length < 40 && !parsed.characterName.includes('.')) {
+        defaultName = parsed.characterName;
+    }
     const name = await callGenericPopup(
         `<h3>Import Character Sheet</h3><p>Enter the character name to assign this sheet to:</p>`,
         POPUP_TYPE.INPUT,
