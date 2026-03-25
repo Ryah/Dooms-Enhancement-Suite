@@ -13,6 +13,7 @@
  */
 import { extensionSettings, lastGeneratedData, committedTrackerData } from '../../core/state.js';
 import { getDoomCounterState, getActiveCharacterColors, saveSettings } from '../../core/persistence.js';
+import { chat } from '../../../../../../../script.js';
 
 /** Cache of last rendered scene data JSON to skip redundant DOM rebuilds */
 let _lastSceneDataJSON = null;
@@ -304,7 +305,7 @@ function getCharacterColor(name) {
  */
 function removeAllSceneElements() {
     if (_hudDragCleanup) _hudDragCleanup();
-    $('.dooms-scene-header, .dooms-info-banner, .dooms-info-hud, .dooms-info-ticker-wrapper').remove();
+    $('.dooms-scene-header, .dooms-info-banner, .dooms-info-hud, .dooms-info-ticker-wrapper, .dooms-scene-transition').remove();
     $('#dooms-ticker-rotate-style').remove();
     $('#chat').removeClass('dooms-ticker-active dooms-ticker-bottom-active');
 }
@@ -324,6 +325,105 @@ function findLastAssistantMessage() {
 // ─────────────────────────────────────────────
 //  Main entry point
 // ─────────────────────────────────────────────
+
+/**
+ * Extracts a location string from an infoBox, handling both flat strings and nested objects.
+ */
+function extractLocationString(infoBox) {
+    if (!infoBox) return '';
+    const loc = infoBox.location;
+    if (!loc) return '';
+    if (typeof loc === 'string') return loc.trim();
+    if (typeof loc === 'object') return (loc.value || '').trim();
+    return '';
+}
+
+/**
+ * Extracts a time string from an infoBox, handling both flat strings and nested objects.
+ */
+function extractTimeString(infoBox) {
+    if (!infoBox) return '';
+    const t = infoBox.time;
+    if (!t) return '';
+    if (typeof t === 'string') return t.trim();
+    if (typeof t === 'object') {
+        if (t.start) return `${t.start}${t.end ? ' → ' + t.end : ''}`;
+        return (t.value || '').trim();
+    }
+    return '';
+}
+
+/**
+ * Injects cinematic transition cards between messages where the location or time changed.
+ * Reads per-message tracker data from chat[].extra.dooms_tracker_swipes.
+ */
+function injectSceneTransitions() {
+    const st = extensionSettings.sceneTracker || {};
+    if (!st.showSceneTransitions) return;
+
+    // Remove old transition cards first (idempotent)
+    $('.dooms-scene-transition').remove();
+
+    if (!chat || !Array.isArray(chat)) return;
+
+    const $messages = $('#chat .mes[is_system="false"]');
+    if (!$messages.length) return;
+
+    let prevLocation = '';
+    let prevTime = '';
+
+    $messages.each(function () {
+        const $mes = $(this);
+        const mesId = parseInt($mes.attr('mesid'), 10);
+        if (isNaN(mesId)) return;
+
+        const message = chat[mesId];
+        if (!message || message.is_user || message.is_system) return;
+
+        const swipeId = message.swipe_id || 0;
+        let swipeData = message.extra?.dooms_tracker_swipes?.[swipeId];
+        if (!swipeData && message.swipe_info?.[swipeId]?.extra?.dooms_tracker_swipes) {
+            swipeData = message.swipe_info[swipeId].extra.dooms_tracker_swipes[swipeId];
+        }
+
+        const infoBox = swipeData?.infoBox;
+        let parsedInfoBox = infoBox;
+        if (typeof infoBox === 'string') {
+            try { parsedInfoBox = JSON.parse(infoBox); } catch { parsedInfoBox = null; }
+        }
+
+        const curLocation = extractLocationString(parsedInfoBox);
+        const curTime = extractTimeString(parsedInfoBox);
+
+        // Only compare if we have a previous value (skip the first message)
+        if (prevLocation || prevTime) {
+            const locationChanged = curLocation && prevLocation && curLocation.toLowerCase() !== prevLocation.toLowerCase();
+            const timeChanged = curTime && prevTime && curTime !== prevTime;
+
+            if (locationChanged || timeChanged) {
+                const parts = [];
+                if (locationChanged) {
+                    parts.push(`<span class="dooms-scene-transition-location">📍 ${curLocation}</span>`);
+                }
+                if (timeChanged && !locationChanged) {
+                    // Only show time alone if location didn't change (otherwise it's implied)
+                    parts.push(`<span class="dooms-scene-transition-time">🕐 ${curTime}</span>`);
+                } else if (timeChanged && locationChanged) {
+                    parts.push(`<span class="dooms-scene-transition-time">${curTime}</span>`);
+                }
+
+                if (parts.length > 0) {
+                    const cardHTML = `<div class="dooms-scene-transition">${parts.join('<br>')}</div>`;
+                    $mes.before(cardHTML);
+                }
+            }
+        }
+
+        // Update previous values for next comparison
+        if (curLocation) prevLocation = curLocation;
+        if (curTime) prevTime = curTime;
+    });
+}
 
 /**
  * Main entry point. Removes old scene headers, finds the last assistant message,
@@ -434,6 +534,9 @@ export function updateChatSceneHeaders() {
             $target.after(headerHTML);
         }
     }
+
+    // Inject scene transition cards between messages where location/time changed
+    injectSceneTransitions();
 }
 
 // ─────────────────────────────────────────────

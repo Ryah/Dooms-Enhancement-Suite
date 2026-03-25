@@ -644,6 +644,10 @@ async function initUI() {
         _syncOptionalField('weather', v);
         _saveSt();
     });
+    $('#rpg-st-show-transitions').on('change', function() {
+        _stSettings().showSceneTransitions = $(this).prop('checked');
+        _saveSt();
+    });
 
     // Layout
     $('#rpg-st-layout').on('change', function() {
@@ -1342,6 +1346,7 @@ async function initUI() {
     $('#rpg-st-show-conditions').prop('checked', st.showConditions === true);
     $('#rpg-st-show-terrain').prop('checked', st.showTerrain === true);
     $('#rpg-st-show-weather').prop('checked', st.showWeather === true);
+    $('#rpg-st-show-transitions').prop('checked', st.showSceneTransitions || false);
     $('#rpg-st-layout').val(st.layout || 'grid');
     $('#rpg-st-font-size').val(st.fontSize ?? 82);
     $('#rpg-st-font-size-value').text((st.fontSize ?? 82) + '%');

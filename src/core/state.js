@@ -74,6 +74,7 @@ export let extensionSettings = {
         showCharacters: true,
         showQuest: true,
         showRecentEvents: true,
+        showSceneTransitions: false, // Cinematic transition cards when location/time changes between messages
         showMoonPhase: false,
         showTension: false,
         showTimeSinceRest: false,

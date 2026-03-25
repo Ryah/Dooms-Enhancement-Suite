@@ -17335,6 +17335,45 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
 }
 
 /* ========================================
+   SCENE TRANSITION CARDS
+   ======================================== */
+
+.dooms-scene-transition {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 14px 24px;
+    margin: 4px auto;
+    max-width: 500px;
+    text-align: center;
+    font-size: 0.9em;
+    color: var(--st-accent, #e94560);
+    opacity: 0.85;
+    animation: dooms-fadein 0.35s ease both;
+}
+
+.dooms-scene-transition-location {
+    font-weight: 600;
+    font-size: 1.1em;
+    letter-spacing: 0.5px;
+}
+
+.dooms-scene-transition-time {
+    font-size: 0.85em;
+    color: var(--st-label-color, #888);
+}
+
+.dooms-scene-transition::before,
+.dooms-scene-transition::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--st-accent, #e94560), transparent);
+    opacity: 0.3;
+}
+
+/* ========================================
    CHARACTER SHEET POPUP
    ======================================== */
 
