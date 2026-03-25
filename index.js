@@ -146,7 +146,7 @@ import { triggerDoomCounter, updateDoomCounterUI, resetCounters } from './src/sy
 import { initSystemLog, openSystemLog } from './src/systems/ui/systemLog.js';
 import { initNotificationLog } from './src/systems/ui/notificationLog.js';
 // Character Sheet
-import { initCharacterSheet, importFullSheetFromMessage, messageHasFullSheet } from './src/systems/ui/characterSheet.js';
+import { initCharacterSheet, importFullSheetFromMessage, messageHasFullSheet, injectFullSheetButtons } from './src/systems/ui/characterSheet.js';
 // ============ DEBUG: Module loaded successfully ============
 console.log('[Dooms Tracker] ✅ All imports resolved successfully. Module body executing.');
 /**
@@ -759,6 +759,16 @@ async function initUI() {
         $('#rpg-st-events-color').val('#999999');
         _saveSt();
         updateChatSceneHeaders();
+    });
+
+    // ── Bunny Mo Integration ──
+    $('#rpg-toggle-bunny-mo').on('change', function () {
+        extensionSettings.bunnyMoIntegration = $(this).prop('checked');
+        $('#rpg-bm-badge').text(extensionSettings.bunnyMoIntegration ? 'on' : 'off');
+        saveSettings();
+        if (extensionSettings.bunnyMoIntegration) {
+            setTimeout(() => injectFullSheetButtons(), 100);
+        }
     });
 
     // ── Doom Counter customization ──
@@ -1422,6 +1432,10 @@ async function initUI() {
     $('#rpg-tts-unread-opacity-value').text((tts.unreadOpacity ?? 55) + '%');
     $('#rpg-tts-transition-speed').val(tts.transitionSpeed ?? 300);
     applyTtsHighlightSettings();
+    // Bunny Mo Integration
+    $('#rpg-toggle-bunny-mo').prop('checked', extensionSettings.bunnyMoIntegration || false);
+    $('#rpg-bm-badge').text(extensionSettings.bunnyMoIntegration ? 'on' : 'off');
+
     // Doom Counter
     const dc = extensionSettings.doomCounter || {};
     $('#rpg-toggle-doom-counter').prop('checked', dc.enabled || false);
@@ -1837,8 +1851,8 @@ jQuery(async () => {
                 const renderedMessage = chat[messageId];
                 if (renderedMessage && !renderedMessage.is_user && !renderedMessage.is_system) {
                     queueExpressionCaptureForSpeaker(renderedMessage.name);
-                    // Add fullsheet import button if message contains fullsheet data
-                    if (messageHasFullSheet(renderedMessage.mes) && messageElement) {
+                    // Add fullsheet import button if message contains fullsheet data and Bunny Mo integration is on
+                    if (extensionSettings.bunnyMoIntegration && messageHasFullSheet(renderedMessage.mes) && messageElement) {
                         const $extraBtns = $(messageElement).find('.mes_buttons .extraMesButtons');
                         if ($extraBtns.length && !$extraBtns.find('.dooms-import-fullsheet-btn').length) {
                             $extraBtns.prepend(`<div class="dooms-import-fullsheet-btn mes_button fa-solid fa-scroll" title="Import Character Sheet"></div>`);
@@ -1873,6 +1887,8 @@ jQuery(async () => {
                 (window.requestIdleCallback || requestAnimationFrame)(() => injectReasoningTtsButtons());
                 // Re-attach expression sync / native expression visibility after chat DOM rebuilds.
                 setTimeout(() => onExpressionSyncChatChanged(), 0);
+                // Inject fullsheet import buttons on existing messages
+                setTimeout(() => injectFullSheetButtons(), 200);
             });
             // TTS Highlight: clear all highlights when switching chats
             eventSource.on(event_types.CHAT_CHANGED, () => {

@@ -42,6 +42,7 @@ export let extensionSettings = {
     customTwistGeneratorRulesPrompt: '', // Custom twist generator rules prompt (empty = use default)
     // NOTE: enableDeceptionSystem, enableOmniscienceFilter, enableCYOA, enableSpotifyMusic
     // and their custom prompt fields have been archived to src/archived-features.js
+    bunnyMoIntegration: false, // Enable Bunny Mo integration (character sheets from !fullsheet)
     enableDynamicWeather: false, // Enable dynamic weather effects based on Info Box weather field
     weatherBackground: true, // Show weather effects in background (behind chat)
     weatherForeground: false, // Show weather effects in foreground (on top of chat)

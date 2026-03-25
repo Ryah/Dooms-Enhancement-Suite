@@ -246,6 +246,29 @@ export function messageHasFullSheet(messageText) {
     return messageText && messageText.includes('SECTION 1/') && messageText.includes('SECTION 2/');
 }
 
+/**
+ * Scans all existing chat messages and injects the import button
+ * on any that contain fullsheet data. Called on CHAT_CHANGED.
+ */
+export function injectFullSheetButtons() {
+    if (!extensionSettings.enabled || !extensionSettings.bunnyMoIntegration) return;
+    const context = SillyTavern.getContext();
+    const chat = context.chat || [];
+
+    $('#chat .mes').each(function () {
+        const mesId = parseInt($(this).attr('mesid'));
+        if (isNaN(mesId)) return;
+        const msg = chat[mesId];
+        if (!msg || msg.is_user || msg.is_system) return;
+        if (!messageHasFullSheet(msg.mes)) return;
+
+        const $extraBtns = $(this).find('.mes_buttons .extraMesButtons');
+        if ($extraBtns.length && !$extraBtns.find('.dooms-import-fullsheet-btn').length) {
+            $extraBtns.prepend(`<div class="dooms-import-fullsheet-btn mes_button fa-solid fa-scroll" title="Import Character Sheet"></div>`);
+        }
+    });
+}
+
 // ─────────────────────────────────────────────
 //  Copy
 // ─────────────────────────────────────────────

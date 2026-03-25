@@ -282,6 +282,8 @@ export function initPortraitBar() {
         $menu.find('#dooms-pb-color-input').val(currentColor);
         // Show or hide "Clear Dialogue Color" based on whether one is set
         $menu.find('[data-action="clear-color"]').toggle(!!ctxColors[characterName]);
+        // Show "Character Sheet" only when Bunny Mo integration is enabled
+        $menu.find('[data-action="character-sheet"]').toggle(!!extensionSettings.bunnyMoIntegration);
 
         // Position near the cursor, clamped to viewport
         $menu.css({ display: 'block', top: 0, left: 0 });
