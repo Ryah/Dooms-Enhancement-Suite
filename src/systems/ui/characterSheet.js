@@ -112,16 +112,22 @@ export function saveCharacterSheet(name, data) {
 //  Renderer
 // ─────────────────────────────────────────────
 
+/** HTML tags allowed through in character sheet content (Bunny Mo uses details/summary/div/span with inline styles) */
+const ALLOWED_TAGS = /^(details|summary|div|span|br|hr|b|i|em|strong|u|s|ul|ol|li|p|h[1-6]|table|thead|tbody|tr|th|td|blockquote|code|pre)$/i;
+
 /**
  * Simple markdown-to-HTML for sheet content (bold, italic, lists, line breaks).
+ * Allows safe HTML tags through (details, summary, div, span, etc.) so Bunny Mo
+ * collapsible sections and styled blocks render correctly.
  */
 function renderMarkdown(text) {
     if (!text) return '';
-    let html = text
-        // Escape HTML
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
+    // Selectively escape HTML — allow safe tags through, escape everything else
+    let html = text.replace(/(<\/?)([\w-]+)([^>]*>)/g, (match, open, tag, rest) => {
+        if (ALLOWED_TAGS.test(tag)) return match;
+        return open.replace(/</g, '&lt;') + tag + rest.replace(/>/g, '&gt;');
+    });
+    html = html
         // Bold
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         // Italic
