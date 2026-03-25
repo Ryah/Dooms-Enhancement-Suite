@@ -794,6 +794,30 @@ async function initUI() {
         saveSettings();
     });
 
+    // ── Advanced section toggle ──
+    $('.rpg-dc-advanced-toggle').on('click', function () {
+        const $body = $('.rpg-dc-advanced-body');
+        const $chevron = $(this).find('.rpg-dc-advanced-chevron');
+        $body.slideToggle(200);
+        $chevron.toggleClass('fa-chevron-down fa-chevron-up');
+    });
+
+    // ── Advanced: Context Messages ──
+    $('#rpg-dc-context-messages').on('input', function () {
+        const v = parseInt($(this).val());
+        _dcSettings().twistContextMessages = v;
+        $('#rpg-dc-context-messages-value').text(v);
+        saveSettings();
+    });
+
+    // ── Advanced: Message Truncation ──
+    $('#rpg-dc-msg-truncation').on('input', function () {
+        const v = parseInt($(this).val());
+        _dcSettings().twistMessageTruncation = v;
+        $('#rpg-dc-msg-truncation-value').text(v);
+        saveSettings();
+    });
+
     $('#rpg-dc-debug-display').on('change', function () {
         const isDebug = $(this).prop('checked');
         _dcSettings().debugDisplay = isDebug;
@@ -1395,6 +1419,10 @@ async function initUI() {
     $('#rpg-dc-countdown').val(dc.countdownLength || 3);
     $('#rpg-dc-countdown-value').text(dc.countdownLength || 3);
     $('#rpg-dc-choices').val(dc.twistChoiceCount || 3);
+    $('#rpg-dc-context-messages').val(dc.twistContextMessages || 15);
+    $('#rpg-dc-context-messages-value').text(dc.twistContextMessages || 15);
+    $('#rpg-dc-msg-truncation').val(dc.twistMessageTruncation || 1200);
+    $('#rpg-dc-msg-truncation-value').text(dc.twistMessageTruncation || 1200);
     $('#rpg-dc-debug-display').prop('checked', dc.debugDisplay || false);
     updateDoomCounterUI();
     // Initialize Doom Counter toast button listener

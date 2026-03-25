@@ -360,6 +360,9 @@ export let extensionSettings = {
         // Countdown speed by tension level (lower tension = faster countdown):
         // tension 1 → decrement by 3, tension 2 → by 2, tension 3-4 → by 1
         // tension 5-10 → resets streak entirely
+        // Advanced twist generation settings
+        twistContextMessages: 15,              // Number of recent chat messages included in twist prompt (1-30)
+        twistMessageTruncation: 1200,          // Max characters per message in twist prompt (200-3000)
     },
     // Preset management for tracker configurations
     presetManager: {

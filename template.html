@@ -946,6 +946,32 @@
                             <span class="rpg-setting-hint" id="rpg-dc-countdown-current">3</span>
                         </div>
 
+                        <div class="rpg-subsection-label rpg-dc-advanced-toggle" style="cursor: pointer; user-select: none;">
+                            Advanced <i class="fa-solid fa-chevron-down rpg-dc-advanced-chevron" style="font-size: 0.7em; margin-left: 4px; transition: transform 0.2s;"></i>
+                        </div>
+                        <div class="rpg-dc-advanced-body" style="display: none;">
+                            <div class="rpg-setting-row">
+                                <div class="rpg-setting-label-group">
+                                    <span class="rpg-setting-label">Context Messages</span>
+                                    <span class="rpg-setting-hint">How many recent chat messages are sent to the AI when generating twist options. More messages = better context awareness but higher token cost. Increase this if twists don't reflect recent events.</span>
+                                </div>
+                                <div class="rpg-slider-group">
+                                    <input type="range" id="rpg-dc-context-messages" class="rpg-range-slider" min="5" max="30" value="15" />
+                                    <span id="rpg-dc-context-messages-value" class="rpg-slider-value">15</span>
+                                </div>
+                            </div>
+                            <div class="rpg-setting-row">
+                                <div class="rpg-setting-label-group">
+                                    <span class="rpg-setting-label">Message Truncation</span>
+                                    <span class="rpg-setting-hint">Maximum characters kept from each message in the twist prompt. Higher = the AI sees more of each message (important for long prose). Lower = saves tokens. If twists ignore recent physical actions or dialogue, increase this.</span>
+                                </div>
+                                <div class="rpg-slider-group">
+                                    <input type="range" id="rpg-dc-msg-truncation" class="rpg-range-slider" min="200" max="3000" step="100" value="1200" />
+                                    <span id="rpg-dc-msg-truncation-value" class="rpg-slider-value">1200</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="rpg-subsection-label">Debug</div>
                         <div class="rpg-setting-row">
                             <div class="rpg-setting-label-group">

@@ -249,10 +249,13 @@ function buildTwistPrompt(twistCount) {
         }
     }
 
-    // ── Recent conversation (last 15 messages for richer context) ──
-    const recentChat = chatMessages.slice(-15).map(m => {
+    // ── Recent conversation (configurable message count and truncation) ──
+    const dc = extensionSettings.doomCounter || {};
+    const contextMessages = dc.twistContextMessages || 15;
+    const messageTruncation = dc.twistMessageTruncation || 1200;
+    const recentChat = chatMessages.slice(-contextMessages).map(m => {
         const role = m.is_user ? playerName : (m.name || aiCharName);
-        const text = (m.mes || '').substring(0, 600);
+        const text = (m.mes || '').substring(0, messageTruncation);
         return `${role}: ${text}`;
     }).join('\n');
 
