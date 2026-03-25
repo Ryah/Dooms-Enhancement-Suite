@@ -12,10 +12,128 @@
  *   - "ticker"   — collapsible bar pinned to top of chat
  */
 import { extensionSettings, lastGeneratedData, committedTrackerData } from '../../core/state.js';
-import { getDoomCounterState, getActiveCharacterColors } from '../../core/persistence.js';
+import { getDoomCounterState, getActiveCharacterColors, saveSettings } from '../../core/persistence.js';
 
 /** Cache of last rendered scene data JSON to skip redundant DOM rebuilds */
 let _lastSceneDataJSON = null;
+
+/** Active HUD drag cleanup function (called when HUD is removed) */
+let _hudDragCleanup = null;
+
+/**
+ * Makes the HUD panel draggable with mouse and touch support.
+ * Saves position to extensionSettings.infoPanelSettings.hudPosition.
+ */
+function initHudDrag() {
+    const $hud = $('.dooms-info-hud');
+    if (!$hud.length) return;
+
+    // Restore saved position
+    const saved = extensionSettings.infoPanelSettings?.hudPosition;
+    if (saved) {
+        $hud.css({ left: saved.left + 'px', top: saved.top + 'px', right: 'auto' });
+    }
+
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let elemStartX = 0, elemStartY = 0;
+    let rafId = null;
+    let pendingX = null, pendingY = null;
+    const MOVE_THRESHOLD = 5;
+
+    function updatePosition() {
+        if (pendingX !== null && pendingY !== null) {
+            $hud.css({ left: pendingX + 'px', top: pendingY + 'px', right: 'auto' });
+            pendingX = null;
+            pendingY = null;
+        }
+        rafId = null;
+    }
+
+    function clamp(x, y) {
+        const w = $hud.outerWidth();
+        const h = $hud.outerHeight();
+        return {
+            x: Math.max(0, Math.min(window.innerWidth - w, x)),
+            y: Math.max(0, Math.min(window.innerHeight - h, y))
+        };
+    }
+
+    function onPointerDown(clientX, clientY) {
+        startX = clientX;
+        startY = clientY;
+        const rect = $hud[0].getBoundingClientRect();
+        elemStartX = rect.left;
+        elemStartY = rect.top;
+        isDragging = false;
+    }
+
+    function onPointerMove(clientX, clientY, e) {
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+        if (!isDragging && Math.sqrt(dx * dx + dy * dy) < MOVE_THRESHOLD) return;
+        if (!isDragging) {
+            isDragging = true;
+            $hud.addClass('dragging');
+        }
+        if (e) e.preventDefault();
+        const clamped = clamp(elemStartX + dx, elemStartY + dy);
+        pendingX = clamped.x;
+        pendingY = clamped.y;
+        if (!rafId) rafId = requestAnimationFrame(updatePosition);
+    }
+
+    function onPointerUp() {
+        if (isDragging) {
+            const rect = $hud[0].getBoundingClientRect();
+            if (!extensionSettings.infoPanelSettings) extensionSettings.infoPanelSettings = {};
+            extensionSettings.infoPanelSettings.hudPosition = {
+                left: Math.round(rect.left),
+                top: Math.round(rect.top)
+            };
+            saveSettings();
+            setTimeout(() => $hud.removeClass('dragging'), 50);
+            isDragging = false;
+        }
+    }
+
+    // Mouse events
+    function onMouseDown(e) {
+        e.preventDefault();
+        onPointerDown(e.clientX, e.clientY);
+        $(document).on('mousemove.hudDrag', onMouseMove);
+        $(document).on('mouseup.hudDrag', onMouseUp);
+    }
+    function onMouseMove(e) { onPointerMove(e.clientX, e.clientY, e); }
+    function onMouseUp(e) {
+        $(document).off('mousemove.hudDrag mouseup.hudDrag');
+        onPointerUp();
+    }
+
+    // Touch events
+    function onTouchStart(e) {
+        const t = e.originalEvent.touches[0];
+        onPointerDown(t.clientX, t.clientY);
+    }
+    function onTouchMove(e) {
+        const t = e.originalEvent.touches[0];
+        onPointerMove(t.clientX, t.clientY, e);
+    }
+    function onTouchEnd() { onPointerUp(); }
+
+    $hud.on('mousedown.hudDrag', onMouseDown);
+    $hud.on('touchstart.hudDrag', onTouchStart);
+    $hud.on('touchmove.hudDrag', onTouchMove);
+    $hud.on('touchend.hudDrag', onTouchEnd);
+
+    // Return cleanup function
+    _hudDragCleanup = () => {
+        $hud.off('.hudDrag');
+        $(document).off('.hudDrag');
+        if (rafId) cancelAnimationFrame(rafId);
+        _hudDragCleanup = null;
+    };
+}
 
 /**
  * Theme color palettes — exact values from the CSS popup theme blocks
@@ -185,6 +303,7 @@ function getCharacterColor(name) {
  * Removes all scene header / info panel elements from the DOM.
  */
 function removeAllSceneElements() {
+    if (_hudDragCleanup) _hudDragCleanup();
     $('.dooms-scene-header, .dooms-info-banner, .dooms-info-hud, .dooms-info-ticker-wrapper').remove();
     $('#dooms-ticker-rotate-style').remove();
     $('#chat').removeClass('dooms-ticker-active dooms-ticker-bottom-active');
@@ -266,7 +385,10 @@ export function updateChatSceneHeaders() {
         }
     } else if (layout === 'hud') {
         const html = createHudHTML(sceneData);
-        if (html) $('#chat').prepend(html);
+        if (html) {
+            $('#chat').prepend(html);
+            initHudDrag();
+        }
     } else if (layout === 'ticker') {
         // Insert the ticker as a flex child of #sheld, directly before #chat.
         // This keeps it in the same stacking context as other extensions (e.g.

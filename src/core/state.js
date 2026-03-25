@@ -290,6 +290,7 @@ export let extensionSettings = {
         showRecentEvents: true,
         hudWidth: 220,                    // HUD panel width in px
         hudOpacity: 85,                   // HUD background opacity (0-100)
+        hudPosition: null,                // Saved drag position { left, top } in px, null = default top-right
     },
     ttsHighlightMode: 'off', // TTS sentence highlight: 'off' or 'highlight' (Gradient Glow Pill)
     ttsHighlightSettings: {
