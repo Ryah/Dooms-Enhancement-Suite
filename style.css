@@ -17568,6 +17568,143 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     color: #e94560;
 }
 
+/* ── Character Sheet Tabs ── */
+.rpg-cs-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 12px;
+    padding: 0 16px;
+}
+
+.rpg-cs-tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 0.88em;
+    font-weight: 500;
+    color: #666;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rpg-cs-tab:hover {
+    color: #aaa;
+}
+
+.rpg-cs-tab.active {
+    color: var(--rpg-accent, #e94560);
+    border-bottom-color: var(--rpg-accent, #e94560);
+}
+
+/* ── Character Sheet Stats Page ── */
+.rpg-cs-stat-section {
+    margin-bottom: 20px;
+    padding: 0 16px;
+}
+
+.rpg-cs-stat-section-title {
+    font-size: 0.72em;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--rpg-accent, #e94560);
+    margin-bottom: 10px;
+    opacity: 0.8;
+}
+
+.rpg-cs-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 0.85em;
+}
+
+.rpg-cs-stat-label {
+    flex: 0 0 130px;
+    color: #888;
+    font-size: 0.9em;
+}
+
+.rpg-cs-stat-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.rpg-cs-stat-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--rpg-accent, #e94560), color-mix(in srgb, var(--rpg-accent, #e94560) 60%, #fff));
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+.rpg-cs-stat-value {
+    flex: 0 0 auto;
+    color: #ccc;
+    font-size: 0.85em;
+    text-align: right;
+    min-width: 80px;
+}
+
+/* ── Relationship Timeline ── */
+.rpg-cs-timeline {
+    padding-left: 8px;
+    border-left: 2px solid rgba(255, 255, 255, 0.06);
+}
+
+.rpg-cs-timeline-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 0.85em;
+}
+
+.rpg-cs-timeline-msg {
+    flex: 0 0 50px;
+    color: #555;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85em;
+}
+
+.rpg-cs-timeline-line {
+    width: 20px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.rpg-cs-timeline-status {
+    color: var(--rpg-accent, #e94560);
+    font-weight: 500;
+}
+
+/* ── Recent Thoughts ── */
+.rpg-cs-thought-entry {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 0.85em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.rpg-cs-thought-msg {
+    flex: 0 0 45px;
+    color: #555;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85em;
+}
+
+.rpg-cs-thought-text {
+    color: #999;
+    font-style: italic;
+}
+
 /* Import fullsheet button on messages */
 .dooms-import-fullsheet-btn {
     cursor: pointer;

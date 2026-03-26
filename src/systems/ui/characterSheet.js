@@ -8,8 +8,17 @@
 import { extensionSettings } from '../../core/state.js';
 import { saveChatData } from '../../core/persistence.js';
 import { resolvePortrait } from './portraitBar.js';
-import { chat_metadata } from '../../../../../../../script.js';
+import { chat_metadata, chat } from '../../../../../../../script.js';
 import { callGenericPopup, POPUP_TYPE } from '../../../../../../popup.js';
+
+// ─────────────────────────────────────────────
+//  Stats cache (cleared on chat change)
+// ─────────────────────────────────────────────
+const statsCache = new Map();
+
+export function clearStatsCache() {
+    statsCache.clear();
+}
 
 // ─────────────────────────────────────────────
 //  Parser
@@ -109,6 +118,232 @@ export function saveCharacterSheet(name, data) {
 }
 
 // ─────────────────────────────────────────────
+//  Stats computation
+// ─────────────────────────────────────────────
+
+function namesMatchLoose(a, b) {
+    const la = (a || '').trim().toLowerCase();
+    const lb = (b || '').trim().toLowerCase();
+    if (!la || !lb) return false;
+    return la === lb || la.startsWith(lb + ' ') || lb.startsWith(la + ' ');
+}
+
+/**
+ * Mines per-message tracker data to compute stats for a character.
+ * Returns a stats object or null if no data found.
+ */
+export function computeCharacterStats(characterName) {
+    if (!characterName || !chat || !Array.isArray(chat)) return null;
+
+    const cached = statsCache.get(characterName.toLowerCase());
+    if (cached) return cached;
+
+    const target = characterName.toLowerCase();
+    let totalAssistantMessages = 0;
+    let presentCount = 0;
+    let speakingCount = 0;
+    let firstSeen = null;
+    let lastSeen = null;
+    let longestAbsence = 0;
+    let currentAbsence = 0;
+    const relationshipChanges = [];
+    let lastRelationship = null;
+    const locationCounts = {};
+    const recentThoughts = [];
+
+    for (let i = 0; i < chat.length; i++) {
+        const message = chat[i];
+        if (!message || message.is_user || message.is_system) continue;
+        totalAssistantMessages++;
+
+        // Get per-swipe tracker data
+        const swipeId = message.swipe_id || 0;
+        let swipeData = message.extra?.dooms_tracker_swipes?.[swipeId];
+        if (!swipeData && message.swipe_info?.[swipeId]?.extra?.dooms_tracker_swipes) {
+            swipeData = message.swipe_info[swipeId].extra.dooms_tracker_swipes[swipeId];
+        }
+        if (!swipeData) continue;
+
+        // Parse characterThoughts
+        let charData = swipeData.characterThoughts;
+        if (typeof charData === 'string') {
+            try { charData = JSON.parse(charData); } catch { charData = null; }
+        }
+        const characters = Array.isArray(charData) ? charData : (charData?.characters || []);
+
+        // Find this character in the array
+        const charEntry = characters.find(c => namesMatchLoose(c.name, target));
+
+        if (charEntry && charEntry.present !== false) {
+            presentCount++;
+            if (firstSeen === null) firstSeen = i;
+            lastSeen = i;
+            if (currentAbsence > longestAbsence) longestAbsence = currentAbsence;
+            currentAbsence = 0;
+
+            // Relationship tracking
+            const rel = charEntry.Relationship || charEntry.relationship?.status || charEntry.relationship;
+            if (rel && typeof rel === 'string' && rel !== lastRelationship) {
+                relationshipChanges.push({ messageIndex: i, status: rel });
+                lastRelationship = rel;
+            }
+
+            // Thoughts
+            const thought = charEntry.thoughts?.content || (typeof charEntry.thoughts === 'string' ? charEntry.thoughts : null);
+            if (thought) {
+                recentThoughts.push({ messageIndex: i, content: thought });
+            }
+        } else {
+            currentAbsence++;
+        }
+
+        // Speaking check (is this character the message speaker?)
+        if (message.name && namesMatchLoose(message.name, target)) {
+            speakingCount++;
+        }
+
+        // Location from infoBox
+        let infoBox = swipeData.infoBox;
+        if (typeof infoBox === 'string') {
+            try { infoBox = JSON.parse(infoBox); } catch { infoBox = null; }
+        }
+        if (infoBox && charEntry && charEntry.present !== false) {
+            const loc = typeof infoBox.location === 'string' ? infoBox.location.trim()
+                : (infoBox.location?.value || '');
+            if (loc) {
+                locationCounts[loc] = (locationCounts[loc] || 0) + 1;
+            }
+        }
+    }
+
+    // Finalize longest absence
+    if (currentAbsence > longestAbsence) longestAbsence = currentAbsence;
+
+    if (totalAssistantMessages === 0 || presentCount === 0) {
+        statsCache.set(target, null);
+        return null;
+    }
+
+    // Sort locations by frequency
+    const topLocations = Object.entries(locationCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name, count]) => ({ name, count }));
+
+    // Keep last 5 thoughts
+    const lastThoughts = recentThoughts.slice(-5).reverse();
+
+    const stats = {
+        totalMessages: totalAssistantMessages,
+        presentCount,
+        presentPercent: Math.round((presentCount / totalAssistantMessages) * 100),
+        speakingCount,
+        speakingPercent: presentCount > 0 ? Math.round((speakingCount / presentCount) * 100) : 0,
+        silentCount: presentCount - speakingCount,
+        silentPercent: presentCount > 0 ? Math.round(((presentCount - speakingCount) / presentCount) * 100) : 0,
+        firstSeen,
+        lastSeen,
+        longestAbsence,
+        relationshipChanges,
+        topLocations,
+        maxLocationCount: topLocations.length > 0 ? topLocations[0].count : 0,
+        lastThoughts,
+    };
+
+    statsCache.set(target, stats);
+    return stats;
+}
+
+/**
+ * Renders the stats page HTML for a character.
+ */
+function renderStatsPage(characterName, stats) {
+    if (!stats) {
+        return `
+            <div class="rpg-cs-empty">
+                <i class="fa-solid fa-chart-bar" style="font-size: 2em; opacity: 0.3; margin-bottom: 12px;"></i>
+                <p>No stats available.</p>
+                <p style="font-size: 0.85em; opacity: 0.6;">Stats are computed from per-message tracker data. Send more messages with the tracker enabled to build data.</p>
+            </div>
+        `;
+    }
+
+    let html = '';
+
+    // Presence section
+    html += `<div class="rpg-cs-stat-section"><div class="rpg-cs-stat-section-title">Presence</div>`;
+    html += statBar('Screen Time', stats.presentPercent, `${stats.presentCount} / ${stats.totalMessages} messages`);
+    html += statRow('First Seen', stats.firstSeen !== null ? `Message #${stats.firstSeen + 1}` : '—');
+    html += statRow('Last Seen', stats.lastSeen !== null ? `Message #${stats.lastSeen + 1}` : '—');
+    html += statRow('Longest Absence', stats.longestAbsence > 0 ? `${stats.longestAbsence} messages` : 'None');
+    html += `</div>`;
+
+    // Activity section
+    html += `<div class="rpg-cs-stat-section"><div class="rpg-cs-stat-section-title">Activity</div>`;
+    html += statBar('Speaking', stats.speakingPercent, `${stats.speakingCount} messages`);
+    html += statBar('Silent Presence', stats.silentPercent, `${stats.silentCount} messages`);
+    html += `</div>`;
+
+    // Relationship timeline
+    if (stats.relationshipChanges.length > 0) {
+        html += `<div class="rpg-cs-stat-section"><div class="rpg-cs-stat-section-title">Relationship Timeline</div>`;
+        html += `<div class="rpg-cs-timeline">`;
+        for (const change of stats.relationshipChanges) {
+            html += `<div class="rpg-cs-timeline-entry">
+                <span class="rpg-cs-timeline-msg">#${change.messageIndex + 1}</span>
+                <span class="rpg-cs-timeline-line"></span>
+                <span class="rpg-cs-timeline-status">${change.status}</span>
+            </div>`;
+        }
+        html += `</div></div>`;
+    }
+
+    // Top locations
+    if (stats.topLocations.length > 0) {
+        html += `<div class="rpg-cs-stat-section"><div class="rpg-cs-stat-section-title">Top Locations</div>`;
+        for (const loc of stats.topLocations) {
+            const pct = stats.maxLocationCount > 0 ? Math.round((loc.count / stats.maxLocationCount) * 100) : 0;
+            html += `<div class="rpg-cs-stat-row">
+                <span class="rpg-cs-stat-label">${loc.name}</span>
+                <div class="rpg-cs-stat-bar"><div class="rpg-cs-stat-bar-fill" style="width: ${pct}%"></div></div>
+                <span class="rpg-cs-stat-value">${loc.count}</span>
+            </div>`;
+        }
+        html += `</div>`;
+    }
+
+    // Recent thoughts
+    if (stats.lastThoughts.length > 0) {
+        html += `<div class="rpg-cs-stat-section"><div class="rpg-cs-stat-section-title">Recent Thoughts</div>`;
+        for (const t of stats.lastThoughts) {
+            const truncated = t.content.length > 120 ? t.content.substring(0, 120) + '...' : t.content;
+            html += `<div class="rpg-cs-thought-entry">
+                <span class="rpg-cs-thought-msg">#${t.messageIndex + 1}</span>
+                <span class="rpg-cs-thought-text">"${truncated}"</span>
+            </div>`;
+        }
+        html += `</div>`;
+    }
+
+    return html;
+}
+
+function statBar(label, percent, detail) {
+    return `<div class="rpg-cs-stat-row">
+        <span class="rpg-cs-stat-label">${label}</span>
+        <div class="rpg-cs-stat-bar"><div class="rpg-cs-stat-bar-fill" style="width: ${percent}%"></div></div>
+        <span class="rpg-cs-stat-value">${detail}</span>
+    </div>`;
+}
+
+function statRow(label, value) {
+    return `<div class="rpg-cs-stat-row">
+        <span class="rpg-cs-stat-label">${label}</span>
+        <span class="rpg-cs-stat-value">${value}</span>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────
 //  Renderer
 // ─────────────────────────────────────────────
 
@@ -160,25 +395,34 @@ export function openCharacterSheet(characterName) {
     // Character name
     $modal.find('.rpg-cs-hero-name').text(characterName);
 
-    // Sections
+    // Build tab bar + content area
     const $sections = $modal.find('.rpg-cs-sections');
     $sections.empty();
 
+    // Tab bar
+    $sections.append(`
+        <div class="rpg-cs-tabs">
+            <div class="rpg-cs-tab active" data-tab="sheet"><i class="fa-solid fa-scroll"></i> Sheet</div>
+            <div class="rpg-cs-tab" data-tab="stats"><i class="fa-solid fa-chart-bar"></i> Stats</div>
+        </div>
+    `);
+
+    // Sheet tab content
+    let sheetHTML = '';
     if (!sheetData || !sheetData.sections || sheetData.sections.length === 0) {
-        $sections.append(`
+        sheetHTML = `
             <div class="rpg-cs-empty">
                 <i class="fa-solid fa-scroll" style="font-size: 2em; opacity: 0.3; margin-bottom: 12px;"></i>
                 <p>No character sheet data.</p>
                 <p style="font-size: 0.85em; opacity: 0.6;">Use Bunny Mo's <code>!fullsheet</code> command to generate one, then click the import button on the resulting message.</p>
             </div>
-        `);
+        `;
     } else {
         if (sheetData.characterTitle) {
-            $sections.append(`<div class="rpg-cs-title">${sheetData.characterTitle}</div>`);
+            sheetHTML += `<div class="rpg-cs-title">${sheetData.characterTitle}</div>`;
         }
-
         for (const section of sheetData.sections) {
-            const sectionHtml = `
+            sheetHTML += `
                 <div class="rpg-cs-section">
                     <div class="rpg-cs-section-header">
                         <span class="rpg-cs-section-emoji">${section.emoji || ''}</span>
@@ -190,9 +434,12 @@ export function openCharacterSheet(characterName) {
                     </div>
                 </div>
             `;
-            $sections.append(sectionHtml);
         }
     }
+    $sections.append(`<div class="rpg-cs-tab-content" data-tab="sheet">${sheetHTML}</div>`);
+
+    // Stats tab content (lazy — computed on first click)
+    $sections.append(`<div class="rpg-cs-tab-content" data-tab="stats" style="display: none;" data-character="${characterName}"></div>`);
 
     $modal.css('display', 'flex');
 }
@@ -315,6 +562,30 @@ function copyCharacterSheet() {
 // ─────────────────────────────────────────────
 
 export function initCharacterSheet() {
+    // Tab switching
+    $(document).on('click', '.rpg-cs-tab', function () {
+        const tabName = $(this).data('tab');
+        const $modal = $(this).closest('#rpg-character-sheet-popup');
+
+        // Update active tab
+        $modal.find('.rpg-cs-tab').removeClass('active');
+        $(this).addClass('active');
+
+        // Show/hide tab content
+        $modal.find('.rpg-cs-tab-content').hide();
+        $modal.find(`.rpg-cs-tab-content[data-tab="${tabName}"]`).show();
+
+        // Lazy-load stats on first click
+        if (tabName === 'stats') {
+            const $statsPanel = $modal.find('.rpg-cs-tab-content[data-tab="stats"]');
+            if ($statsPanel.children().length === 0) {
+                const charName = $statsPanel.data('character');
+                const stats = computeCharacterStats(charName);
+                $statsPanel.html(renderStatsPage(charName, stats));
+            }
+        }
+    });
+
     // Section collapse/expand
     $(document).on('click', '.rpg-cs-section-header', function () {
         const $body = $(this).next('.rpg-cs-section-body');
