@@ -306,15 +306,58 @@ export function computeCharacterStats(characterName) {
         if (!message || message.is_user || message.is_system) continue;
         totalAssistantMessages++;
 
-        // Speaking: this character is the message author
+        const mesText = message.mes || '';
+        const mesLower = mesText.toLowerCase();
+
+        // Speaking detection: check multiple signals
+        let isSpeaking = false;
+
+        // Signal 1: message.name matches (works for solo character chats)
         if (message.name && namesMatchLoose(message.name, target)) {
+            isSpeaking = true;
+        }
+
+        // Signal 2: Character has dialogue in this message (font color tags with their name nearby)
+        // Pattern: character name appears near/before a <font color> dialogue block
+        if (!isSpeaking && mesLower.includes(target)) {
+            // Check for "CharName:" or "**CharName**" speaker patterns followed by dialogue
+            const namePatterns = [
+                new RegExp(`\\b${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\s*[:：]\\s*[""\u201c]`, 'i'),  // Name: "dialogue"
+                new RegExp(`\\*\\*${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\*\\*`, 'i'),  // **Name**
+                new RegExp(`<font[^>]*>[^<]*</font>[^]*?\\b${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),  // font tag near name
+            ];
+            // Also check if name appears right before a font-colored dialogue section
+            const fontTagRegex = /<font\s+color=["'][^"']+["'][^>]*>/gi;
+            const fontMatches = [...mesText.matchAll(fontTagRegex)];
+            if (fontMatches.length > 0) {
+                // Check if character name appears in the ~200 chars before any font tag
+                for (const fm of fontMatches) {
+                    const precedingText = mesText.substring(Math.max(0, fm.index - 200), fm.index).toLowerCase();
+                    if (precedingText.includes(target)) {
+                        isSpeaking = true;
+                        break;
+                    }
+                }
+            }
+            // Fall back to name: "dialogue" patterns
+            if (!isSpeaking) {
+                for (const pat of namePatterns) {
+                    if (pat.test(mesText)) {
+                        isSpeaking = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (isSpeaking) {
             speakingCount++;
             if (firstSpoken === null) firstSpoken = i;
             lastSpoken = i;
         }
 
         // Mentioned in message text (lightweight check)
-        if (message.mes && message.mes.toLowerCase().includes(target)) {
+        if (mesLower.includes(target)) {
             mentionCount++;
         }
     }
