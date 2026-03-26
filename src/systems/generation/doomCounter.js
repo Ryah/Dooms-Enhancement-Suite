@@ -373,7 +373,37 @@ export async function triggerDoomCounter() {
     }
     _triggerInProgress = true;
 
-    // ── Inject inline element into chat (loading state) ──────────────
+    // ── Trap Mode: silent trigger, 1 twist, auto-inject ──────────────
+    if (dc.trapMode) {
+        try {
+            console.log('[Doom Counter] Trap mode triggered — generating silent twist...');
+
+            const twists = await generateTwistOptions(1);
+            if (!twists || twists.length === 0) {
+                console.warn('[Doom Counter] Trap mode: no twists generated.');
+                return;
+            }
+
+            const chosen = twists[0];
+            const state = getDoomCounterState();
+            state.pendingTwist = chosen.description;
+            state.triggered = false;
+            state.lowStreakCount = 0;
+            state.countdownActive = false;
+            state.countdownCount = dc.countdownLength || 3;
+            setDoomCounterState(state);
+
+            console.log(`[Doom Counter] Trap mode twist silently injected: "${chosen.title}"`);
+            updateDoomCounterUI();
+        } catch (error) {
+            console.error('[Doom Counter] Trap mode error:', error);
+        } finally {
+            _triggerInProgress = false;
+        }
+        return;
+    }
+
+    // ── Normal Mode: visible trigger with card selection ──────────────
     const $inline = $(`
         <div class="dooms-dc-inline">
             <div class="dooms-dc-inline-header">
@@ -535,6 +565,17 @@ export function updateDoomCounterUI() {
 
     const state = getDoomCounterState();
     const threshold = dc.lowTensionThreshold || 5;
+
+    // Trap mode: hide all status indicators
+    if (dc.trapMode) {
+        $('#rpg-dc-status').html('<span style="color: #666;">🪤 Trap mode — status hidden</span>');
+        $('#rpg-dc-streak').text('?');
+        $('#rpg-dc-streak-max').text('?');
+        $('#rpg-dc-countdown-display').hide();
+        $('#rpg-dc-badge').text('trap');
+        updateDoomDebugHud();
+        return;
+    }
 
     // Update streak display
     $('#rpg-dc-streak').text(state.lowStreakCount);

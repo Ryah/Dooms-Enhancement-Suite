@@ -832,6 +832,13 @@ async function initUI() {
         saveSettings();
     });
 
+    $('#rpg-dc-trap-mode').on('change', function () {
+        _dcSettings().trapMode = $(this).prop('checked');
+        saveSettings();
+        updateDoomCounterUI();
+        updateChatSceneHeaders();
+    });
+
     // ── Advanced section toggle ──
     $('.rpg-dc-advanced-toggle').on('click', function () {
         const $body = $('.rpg-dc-advanced-body');
@@ -1482,6 +1489,7 @@ async function initUI() {
     $('#rpg-dc-msg-truncation-value').text(dc.twistMessageTruncation || 1200);
     $('#rpg-dc-injection-depth').val(dc.twistInjectionDepth || 0);
     $('#rpg-dc-injection-depth-value').text(dc.twistInjectionDepth || 0);
+    $('#rpg-dc-trap-mode').prop('checked', dc.trapMode || false);
     $('#rpg-dc-debug-display').prop('checked', dc.debugDisplay || false);
     updateDoomCounterUI();
     // Initialize Doom Counter toast button listener

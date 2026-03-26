@@ -464,7 +464,7 @@ export function updateChatSceneHeaders() {
     }
     // Skip rebuild if data + settings are identical to last render
     // Include doom counter state in cache key so badge updates when streak/countdown changes
-    const dcState = (extensionSettings.doomCounter?.enabled && extensionSettings.doomCounter?.debugDisplay) ? getDoomCounterState() : null;
+    const dcState = (extensionSettings.doomCounter?.enabled && extensionSettings.doomCounter?.debugDisplay && !extensionSettings.doomCounter?.trapMode) ? getDoomCounterState() : null;
     const cacheKey = JSON.stringify({ sceneData, st, dcState });
     if (cacheKey === _lastSceneDataJSON) {
         // Check if the element is still in the DOM
