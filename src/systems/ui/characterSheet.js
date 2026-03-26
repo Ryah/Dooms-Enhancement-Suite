@@ -230,20 +230,25 @@ function enterRepositionMode(characterName) {
         isDragging = false;
     });
 
-    // Confirm — use document delegation so clicks always reach the handler
-    $(document).on('click.reposition', '.rpg-cs-reposition-confirm', function (e) {
-        e.stopPropagation();
-        saveHeroPosition(characterName, currentX, currentY);
-        exitRepositionMode();
-        toastr.success('Image position saved.', '', { timeOut: 1500 });
-    });
+    // Confirm and Cancel — bind directly to the buttons after they exist in DOM
+    setTimeout(() => {
+        $hero.find('.rpg-cs-reposition-confirm').on('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            saveHeroPosition(characterName, currentX, currentY);
+            exitRepositionMode();
+            toastr.success('Image position saved.', '', { timeOut: 1500 });
+        });
 
-    // Cancel
-    $(document).on('click.reposition', '.rpg-cs-reposition-cancel', function (e) {
-        e.stopPropagation();
-        $art.css('object-position', `${pos.x}% ${pos.y}%`);
-        exitRepositionMode();
-    });
+        $hero.find('.rpg-cs-reposition-cancel').on('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            $art.css('object-position', `${pos.x}% ${pos.y}%`);
+            exitRepositionMode();
+        });
+    }, 0);
 }
 
 function exitRepositionMode() {
