@@ -17582,7 +17582,7 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     cursor: pointer;
     font-size: 0.88em;
     font-weight: 500;
-    color: #666;
+    color: #999;
     border-bottom: 2px solid transparent;
     transition: color 0.2s, border-color 0.2s;
     display: flex;
@@ -17591,12 +17591,12 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
 }
 
 .rpg-cs-tab:hover {
-    color: #aaa;
+    color: #ccc;
 }
 
 .rpg-cs-tab.active {
-    color: var(--rpg-accent, #e94560);
-    border-bottom-color: var(--rpg-accent, #e94560);
+    color: #e94560;
+    border-bottom-color: #e94560;
 }
 
 /* ── Character Sheet Stats Page ── */
