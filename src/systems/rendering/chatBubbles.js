@@ -635,10 +635,11 @@ function _injectBubbleAvatars(mesElement) {
         if (spaceNeeded > gutterWidth) {
             extraPadding = spaceNeeded - gutterWidth;
         }
-        // Avatar left: position so right edge = mesText left + extraPadding - gap
-        // i.e. avatar sits in the gutter, right edge is `gap` px before the (shifted) text
-        avatarLeft = gutterWidth - avatarSize - gap + extraPadding;
-        if (avatarLeft < 0) avatarLeft = 0;
+        // Center the avatar horizontally in the available gutter space.
+        // The gutter extends from the left edge of .mes to the left edge of .mes_text
+        // (plus any extra padding we added). Center the avatar within that total width.
+        const totalGutter = gutterWidth + extraPadding;
+        avatarLeft = Math.max(0, Math.round((totalGutter - avatarSize) / 2));
 
         // Apply the extra padding to .mes_text to push bubbles right
         mesText.style.paddingLeft = extraPadding > 0 ? extraPadding + 'px' : '';
