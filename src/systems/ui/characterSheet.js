@@ -357,10 +357,9 @@ function renderStatsPage(characterName, stats) {
     if (stats.lastThoughts.length > 0) {
         html += `<div class="rpg-cs-stat-section"><div class="rpg-cs-stat-section-title">Recent Thoughts</div>`;
         for (const t of stats.lastThoughts) {
-            const truncated = t.content.length > 120 ? t.content.substring(0, 120) + '...' : t.content;
             html += `<div class="rpg-cs-thought-entry">
                 <span class="rpg-cs-thought-msg">#${t.messageIndex + 1}</span>
-                <span class="rpg-cs-thought-text">"${truncated}"</span>
+                <span class="rpg-cs-thought-text">"${t.content}"</span>
             </div>`;
         }
         html += `</div>`;
