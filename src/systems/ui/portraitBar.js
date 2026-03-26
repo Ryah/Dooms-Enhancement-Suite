@@ -682,19 +682,8 @@ export function resolveFullPortrait(name) {
     const syncedExpression = getExpressionAwarePortrait(name, null);
     if (syncedExpression) return syncedExpression;
 
-    // 1. Custom uploaded avatars (already full-res data URIs)
-    const avatars = extensionSettings.npcAvatars;
-    if (avatars) {
-        if (avatars[name]) return avatars[name];
-        const lowerName = name.toLowerCase();
-        for (const key of Object.keys(avatars)) {
-            if (key.toLowerCase().startsWith(lowerName + ' ')) {
-                return avatars[key];
-            }
-        }
-    }
-
-    // 2. SillyTavern character card avatars — full resolution
+    // 1. Try SillyTavern character card avatars first — these are full resolution
+    //    Preferred over npcAvatars which are cropped/downscaled to 330×440.
     if (extensionSettings.portraitAutoImport !== false) {
         try {
             const findFullRes = (charList) => {
@@ -720,6 +709,18 @@ export function resolveFullPortrait(name) {
             }
         } catch (e) {
             console.warn('[Dooms Portrait Bar] Full-res avatar lookup failed:', e.message);
+        }
+    }
+
+    // 2. Custom uploaded avatars (npcAvatars — 330×440 data URIs, lower quality fallback)
+    const avatars = extensionSettings.npcAvatars;
+    if (avatars) {
+        if (avatars[name]) return avatars[name];
+        const lowerName = name.toLowerCase();
+        for (const key of Object.keys(avatars)) {
+            if (key.toLowerCase().startsWith(lowerName + ' ')) {
+                return avatars[key];
+            }
         }
     }
 
