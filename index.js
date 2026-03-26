@@ -411,6 +411,50 @@ async function initUI() {
     $('#rpg-pb-show-absent').on('change', function() { _pbSettings().showAbsentCharacters = $(this).prop('checked'); _savePb(); updatePortraitBar(); });
     $('#rpg-pb-show-arrows').on('change', function() { _pbSettings().showScrollArrows = $(this).prop('checked'); _savePb(); });
     $('#rpg-pb-auto-import').on('change', function() { extensionSettings.portraitAutoImport = $(this).prop('checked'); saveSettings(); });
+
+    // Export portraits as individual image downloads
+    $('#rpg-export-portraits').on('click', async function() {
+        const avatars = extensionSettings.npcAvatars || {};
+        const fullRes = extensionSettings.npcAvatarsFullRes || {};
+        const names = Object.keys({ ...avatars, ...fullRes });
+        if (names.length === 0) {
+            toastr.info('No uploaded portraits to export.', '', { timeOut: 2000 });
+            return;
+        }
+        let exported = 0;
+        for (const name of names) {
+            // Prefer full-res, fall back to cropped
+            const dataUri = fullRes[name] || avatars[name];
+            if (!dataUri) continue;
+            try {
+                // Extract mime type and extension
+                const match = dataUri.match(/^data:image\/(\w+);base64,/);
+                const ext = match ? match[1].replace('jpeg', 'jpg') : 'png';
+                // Convert base64 to blob
+                const byteString = atob(dataUri.split(',')[1]);
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                const blob = new Blob([ab], { type: match ? `image/${match[1]}` : 'image/png' });
+                // Trigger download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                exported++;
+                // Small delay between downloads so browser doesn't block them
+                if (names.length > 1) await new Promise(r => setTimeout(r, 300));
+            } catch (e) {
+                console.error(`[Dooms Tracker] Failed to export portrait for ${name}:`, e);
+            }
+        }
+        toastr.success(`Exported ${exported} portrait${exported !== 1 ? 's' : ''}.`, '', { timeOut: 3000 });
+    });
+
     $('#rpg-pb-sync-expressions').on('change', function() {
         extensionSettings.syncExpressionsToPresentCharacters = $(this).prop('checked');
         saveSettings();
