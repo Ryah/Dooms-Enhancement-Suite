@@ -712,7 +712,19 @@ export function resolveFullPortrait(name) {
         }
     }
 
-    // 2. Custom uploaded avatars (npcAvatars — 330×440 data URIs, lower quality fallback)
+    // 2. Full-res originals stored at upload time (pre-crop)
+    const fullRes = extensionSettings.npcAvatarsFullRes;
+    if (fullRes) {
+        if (fullRes[name]) return fullRes[name];
+        const lowerName = name.toLowerCase();
+        for (const key of Object.keys(fullRes)) {
+            if (key.toLowerCase().startsWith(lowerName + ' ')) {
+                return fullRes[key];
+            }
+        }
+    }
+
+    // 3. Cropped portraits (npcAvatars — 660×880 data URIs)
     const avatars = extensionSettings.npcAvatars;
     if (avatars) {
         if (avatars[name]) return avatars[name];
@@ -826,18 +838,25 @@ function triggerPortraitUpload(characterName) {
                 return;
             }
 
-            // Upscale the cropped image to a consistent high-res size and re-encode as PNG.
+            // Upscale the cropped image to a high-res size and re-encode as PNG.
             // The built-in crop popup returns a low-res JPEG at the cropped pixel size,
             // so we redraw it onto a larger canvas for crisp portrait display.
-            const PORTRAIT_W = 330;
-            const PORTRAIT_H = 440;
+            const PORTRAIT_W = 660;
+            const PORTRAIT_H = 880;
             const hiResDataUrl = await upscaleImage(String(croppedImage), PORTRAIT_W, PORTRAIT_H);
 
-            // Store in npcAvatars (same store as thoughts panel)
+            // Store cropped portrait for portrait bar / chat bubbles
             if (!extensionSettings.npcAvatars) {
                 extensionSettings.npcAvatars = {};
             }
             extensionSettings.npcAvatars[characterName] = hiResDataUrl;
+
+            // Store the original full-res image (pre-crop) for character sheets
+            if (!extensionSettings.npcAvatarsFullRes) {
+                extensionSettings.npcAvatarsFullRes = {};
+            }
+            extensionSettings.npcAvatarsFullRes[characterName] = dataUrl;
+
             saveSettings();
 
             // Clear file cache so resolvePortrait picks up the new npcAvatar
@@ -868,6 +887,10 @@ function triggerPortraitUpload(characterName) {
 function removePortrait(characterName) {
     if (extensionSettings.npcAvatars && extensionSettings.npcAvatars[characterName]) {
         delete extensionSettings.npcAvatars[characterName];
+        // Also remove the full-res original if stored
+        if (extensionSettings.npcAvatarsFullRes && extensionSettings.npcAvatarsFullRes[characterName]) {
+            delete extensionSettings.npcAvatarsFullRes[characterName];
+        }
         saveSettings();
         portraitFileCache.delete(characterName);
         // Remove from no-portrait localStorage cache so file probing can resume for this character
