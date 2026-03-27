@@ -18198,6 +18198,89 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     border-radius: 3px;
 }
 
+/* ── Book Toggle Checkbox ──────────────────────────────────────────── */
+.rpg-lb-graph-book-toggle {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--rpg-highlight, #4a7ba7);
+}
+.rpg-lb-graph-book-item.filtered-out {
+    opacity: 0.3 !important;
+}
+.rpg-lb-graph-book-item.filtered-out .rpg-lb-graph-book-dot {
+    background: #555 !important;
+}
+.rpg-lb-graph-books-toggle-all {
+    font-size: 0.75em;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(74, 123, 167, 0.3);
+    background: transparent;
+    color: var(--rpg-text, #e0e0e0);
+    cursor: pointer;
+    margin-left: auto;
+}
+.rpg-lb-graph-books-toggle-all:hover {
+    background: rgba(74, 123, 167, 0.15);
+}
+.rpg-lb-graph-label {
+    display: flex;
+    align-items: center;
+}
+
+/* ── Isolate Indicator ────────────────────────────────────────────── */
+.rpg-lb-graph-clear-isolate {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(233, 69, 96, 0.4);
+    background: rgba(233, 69, 96, 0.1);
+    color: #e94560;
+    cursor: pointer;
+    font-size: 0.82em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.15s;
+}
+.rpg-lb-graph-clear-isolate:hover {
+    background: rgba(233, 69, 96, 0.2);
+}
+
+/* ── Right-Click Context Menu ─────────────────────────────────────── */
+.rpg-lb-graph-context-menu {
+    display: none;
+    position: fixed;
+    z-index: 10001;
+    min-width: 160px;
+    background: var(--rpg-bg, #1a1a2e);
+    border: 1px solid rgba(74, 123, 167, 0.3);
+    border-radius: 8px;
+    padding: 4px 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.rpg-lb-graph-ctx-item {
+    padding: 8px 16px;
+    font-size: 0.85em;
+    color: var(--rpg-text, #e0e0e0);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+}
+.rpg-lb-graph-ctx-item:hover {
+    background: rgba(74, 123, 167, 0.15);
+}
+.rpg-lb-graph-ctx-item i {
+    width: 16px;
+    text-align: center;
+    opacity: 0.7;
+}
+
 /* ── Mobile ───────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
     .rpg-lb-graph-sidebar {

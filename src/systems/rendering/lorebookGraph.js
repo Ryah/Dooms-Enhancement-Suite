@@ -18,6 +18,8 @@ let graphData = { nodes: null, edges: null };
 let selectedNodeId = null;
 let graphScope = 'all'; // 'all' | campaignId | worldName
 let graphFilters = { keywords: true, groups: true };
+let bookVisibility = {}; // { bookName: boolean } — per-book filter
+let isolatedNodeId = null; // When set, only show this node + neighbors
 let allEntriesCache = [];
 
 const EXTENSION_PATH = 'scripts/extensions/third-party/Dooms-Enhancement-Suite';
@@ -231,20 +233,32 @@ function buildGraphHTML() {
     html += `<label class="rpg-lb-graph-checkbox"><input type="checkbox" data-filter="groups" ${graphFilters.groups ? 'checked' : ''}> Inclusion Groups</label>`;
     html += '</div>';
 
-    // Book list
+    // Book list with visibility toggles
     html += '<div class="rpg-lb-graph-section">';
-    html += '<label class="rpg-lb-graph-label">Lorebooks</label>';
+    html += '<label class="rpg-lb-graph-label">Lorebooks <button class="rpg-lb-graph-books-toggle-all" title="Toggle all">All</button></label>';
     html += '<div class="rpg-lb-graph-book-list">';
     const scopeBooks = getScopeBooks();
+    // Initialize visibility for new books
+    for (const name of scopeBooks) {
+        if (bookVisibility[name] === undefined) bookVisibility[name] = true;
+    }
     for (const name of scopeBooks) {
         const isActive = activeNames.includes(name);
+        const isVisible = bookVisibility[name] !== false;
         const shortName = name.length > 25 ? name.substring(0, 23) + '...' : name;
-        html += `<div class="rpg-lb-graph-book-item ${isActive ? 'active' : ''}" data-world="${name}" title="${name}">`;
+        html += `<div class="rpg-lb-graph-book-item ${isActive ? 'active' : ''} ${!isVisible ? 'filtered-out' : ''}" data-world="${name}" title="${name}">`;
+        html += `<input type="checkbox" class="rpg-lb-graph-book-toggle" data-world="${name}" ${isVisible ? 'checked' : ''}>`;
         html += `<span class="rpg-lb-graph-book-dot" style="background: ${getBookColor(name, scopeBooks)};"></span>`;
         html += `<span class="rpg-lb-graph-book-name">${shortName}</span>`;
         html += '</div>';
     }
     html += '</div>';
+    html += '</div>';
+
+    // Isolate indicator (hidden by default)
+    html += '<div class="rpg-lb-graph-section rpg-lb-graph-isolate-indicator" style="display:none;">';
+    html += '<label class="rpg-lb-graph-label">Isolated View</label>';
+    html += '<button class="rpg-lb-graph-clear-isolate"><i class="fa-solid fa-arrows-rotate"></i> Show All Nodes</button>';
     html += '</div>';
 
     // Stats
@@ -269,6 +283,12 @@ function buildGraphHTML() {
     html += '<button class="rpg-lb-graph-ctrl-btn" data-action="zoom-in" title="Zoom in"><i class="fa-solid fa-plus"></i></button>';
     html += '<button class="rpg-lb-graph-ctrl-btn" data-action="zoom-out" title="Zoom out"><i class="fa-solid fa-minus"></i></button>';
     html += '<button class="rpg-lb-graph-ctrl-btn" data-action="fit" title="Fit all"><i class="fa-solid fa-expand"></i></button>';
+    html += '</div>';
+
+    // Right-click context menu (hidden by default)
+    html += '<div class="rpg-lb-graph-context-menu" id="rpg-lb-graph-context-menu">';
+    html += '<div class="rpg-lb-graph-ctx-item" data-action="isolate"><i class="fa-solid fa-crosshairs"></i> Isolate</div>';
+    html += '<div class="rpg-lb-graph-ctx-item" data-action="open-editor"><i class="fa-solid fa-pen-to-square"></i> Open in Editor</div>';
     html += '</div>';
 
     // Detail panel (hidden by default)
@@ -533,27 +553,161 @@ function setupGraphEvents() {
         });
     });
 
-    // Book item click in sidebar → scope to that book
-    modal.querySelectorAll('.rpg-lb-graph-book-item').forEach(item => {
-        item.addEventListener('click', async () => {
-            const world = item.dataset.world;
-            // Toggle: if already scoped to this book, go back to current scope
-            const scopeSelect = modal.querySelector('.rpg-lb-graph-scope');
-            if (scopeSelect) {
-                // Don't change scope dropdown, just highlight the book visually
-                // and focus the graph on that book's nodes
-                if (network) {
-                    const bookNodes = allEntriesCache
-                        .filter(e => e.bookName === world)
-                        .map(e => e.id);
-                    if (bookNodes.length > 0) {
-                        network.selectNodes(bookNodes);
-                        network.fit({ nodes: bookNodes, animation: true });
-                    }
-                }
+    // Book name click in sidebar → focus on that book's nodes
+    modal.querySelectorAll('.rpg-lb-graph-book-name').forEach(nameEl => {
+        nameEl.addEventListener('click', () => {
+            const world = nameEl.closest('.rpg-lb-graph-book-item')?.dataset.world;
+            if (!world || !network) return;
+            const bookNodes = allEntriesCache
+                .filter(e => e.bookName === world)
+                .map(e => e.id);
+            if (bookNodes.length > 0) {
+                network.selectNodes(bookNodes);
+                network.fit({ nodes: bookNodes, animation: true });
             }
         });
     });
+
+    // Book toggle checkboxes → show/hide books on the graph
+    modal.querySelectorAll('.rpg-lb-graph-book-toggle').forEach(cb => {
+        cb.addEventListener('change', async (e) => {
+            e.stopPropagation();
+            const world = e.target.dataset.world;
+            bookVisibility[world] = e.target.checked;
+            const item = e.target.closest('.rpg-lb-graph-book-item');
+            if (item) item.classList.toggle('filtered-out', !e.target.checked);
+            await applyBookFilter();
+        });
+    });
+
+    // Toggle all books button
+    modal.querySelector('.rpg-lb-graph-books-toggle-all')?.addEventListener('click', async () => {
+        const scopeBooks = getScopeBooks();
+        const allVisible = scopeBooks.every(b => bookVisibility[b] !== false);
+        const newState = !allVisible;
+        for (const b of scopeBooks) bookVisibility[b] = newState;
+        // Update checkboxes in UI
+        modal.querySelectorAll('.rpg-lb-graph-book-toggle').forEach(cb => {
+            cb.checked = newState;
+            const item = cb.closest('.rpg-lb-graph-book-item');
+            if (item) item.classList.toggle('filtered-out', !newState);
+        });
+        await applyBookFilter();
+    });
+
+    // Clear isolate button
+    modal.querySelector('.rpg-lb-graph-clear-isolate')?.addEventListener('click', async () => {
+        isolatedNodeId = null;
+        const indicator = modal.querySelector('.rpg-lb-graph-isolate-indicator');
+        if (indicator) indicator.style.display = 'none';
+        await applyBookFilter();
+    });
+
+    // Right-click context menu on nodes
+    if (network) {
+        network.on('oncontext', (params) => {
+            params.event.preventDefault();
+            const nodeId = network.getNodeAt(params.pointer.DOM);
+            const ctxMenu = document.getElementById('rpg-lb-graph-context-menu');
+            if (!ctxMenu) return;
+
+            if (!nodeId) {
+                ctxMenu.style.display = 'none';
+                return;
+            }
+
+            // Position and show context menu
+            ctxMenu.style.left = params.event.pageX + 'px';
+            ctxMenu.style.top = params.event.pageY + 'px';
+            ctxMenu.style.display = 'block';
+            ctxMenu.dataset.nodeId = nodeId;
+        });
+    }
+
+    // Context menu item clicks
+    modal.addEventListener('click', async (e) => {
+        const ctxItem = e.target.closest('.rpg-lb-graph-ctx-item');
+        const ctxMenu = document.getElementById('rpg-lb-graph-context-menu');
+        if (!ctxItem || !ctxMenu) return;
+
+        const action = ctxItem.dataset.action;
+        const nodeId = ctxMenu.dataset.nodeId;
+        ctxMenu.style.display = 'none';
+
+        if (!nodeId) return;
+        const nodeData = graphData.nodes.get(nodeId);
+        if (!nodeData) return;
+
+        if (action === 'isolate') {
+            isolatedNodeId = nodeId;
+            const indicator = modal.querySelector('.rpg-lb-graph-isolate-indicator');
+            if (indicator) indicator.style.display = 'block';
+            await applyBookFilter();
+            // Fit to visible nodes
+            if (network) {
+                setTimeout(() => network.fit({ animation: true }), 100);
+            }
+        } else if (action === 'open-editor') {
+            const meta = nodeData._meta;
+            const lb = extensionSettings.lorebook || {};
+            lb.viewMode = 'list';
+            saveSettings();
+            import('./lorebook.js').then(mod => {
+                mod.setSelectedBookAndEntry(meta.bookName, meta.uid);
+                mod.renderLorebook();
+            });
+        }
+    });
+
+    // Close context menu on click elsewhere
+    document.addEventListener('click', () => {
+        const ctxMenu = document.getElementById('rpg-lb-graph-context-menu');
+        if (ctxMenu) ctxMenu.style.display = 'none';
+    });
+}
+
+// ─── Book Filter / Isolate ───────────────────────────────────────────────
+
+async function applyBookFilter() {
+    if (!network || !graphData.nodes) return;
+
+    // Get all node IDs and their book names
+    const allNodes = graphData.nodes.get();
+    let visibleNodeIds;
+
+    if (isolatedNodeId) {
+        // Isolate mode: show only the isolated node + its direct neighbors
+        const connectedEdges = network.getConnectedEdges(isolatedNodeId);
+        const neighborIds = new Set([isolatedNodeId]);
+        for (const edgeId of connectedEdges) {
+            const edge = graphData.edges.get(edgeId);
+            if (edge) {
+                neighborIds.add(edge.from);
+                neighborIds.add(edge.to);
+            }
+        }
+        visibleNodeIds = neighborIds;
+    } else {
+        // Normal mode: filter by book visibility
+        visibleNodeIds = new Set(
+            allNodes
+                .filter(n => bookVisibility[n._meta?.bookName] !== false)
+                .map(n => n.id)
+        );
+    }
+
+    // Update node visibility via opacity and hidden flag
+    const updates = allNodes.map(n => ({
+        id: n.id,
+        hidden: !visibleNodeIds.has(n.id),
+    }));
+    graphData.nodes.update(updates);
+
+    // Update stats with visible counts
+    const visibleEdges = graphData.edges.get().filter(e =>
+        visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to)
+    );
+    updateStats(visibleNodeIds.size, visibleEdges.length);
 }
 
 // ─── Rebuild Graph ───────────────────────────────────────────────────────────
@@ -564,6 +718,9 @@ async function rebuildGraph() {
     if (!container) return;
 
     if (loading) loading.style.display = 'flex';
+
+    // Reset isolate mode
+    isolatedNodeId = null;
 
     // Destroy existing network
     if (network) {
