@@ -18294,11 +18294,11 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
 
 /* ── Mobile ───────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-    .rpg-lb-graph-sidebar {
-        display: none;
+    .rpg-lb-graph-layout {
+        display: none !important;
     }
-    .rpg-lb-graph-detail {
-        width: 100%;
+    .rpg-lb-view-btn[data-view="graph"] {
+        display: none !important;
     }
 }
 
