@@ -6,7 +6,7 @@
  * Extension settings - persisted to SillyTavern settings
  */
 export let extensionSettings = {
-    settingsVersion: 10, // Version number for settings migrations (v10 = add Doom Counter defaults)
+    settingsVersion: 13, // Version number for settings migrations (v12-v13 add expression sync settings)
     enabled: true,
     autoUpdate: false,
     updateDepth: 4, // How many messages to include in the context
@@ -42,6 +42,8 @@ export let extensionSettings = {
     customTwistGeneratorRulesPrompt: '', // Custom twist generator rules prompt (empty = use default)
     // NOTE: enableDeceptionSystem, enableOmniscienceFilter, enableCYOA, enableSpotifyMusic
     // and their custom prompt fields have been archived to src/archived-features.js
+    bunnyMoIntegration: false, // Enable Bunny Mo integration (character sheets from !fullsheet)
+    heroPositions: {},         // Per-character hero art positioning { characterName: { x, y } }
     enableDynamicWeather: false, // Enable dynamic weather effects based on Info Box weather field
     weatherBackground: true, // Show weather effects in background (behind chat)
     weatherForeground: false, // Show weather effects in foreground (on top of chat)
@@ -101,6 +103,11 @@ export let extensionSettings = {
         borderWidth: 3,
         // Theme integration
         themeControlled: false,
+    },
+    // Inline Banners — cinematic transition cards between messages
+    inlineBanners: {
+        enabled: false,                    // Master toggle
+        style: 'cinematic',               // 'cinematic' | 'minimal' | 'hybrid'
     },
     panelPosition: 'right', // 'left', 'right', or 'top'
     theme: 'default', // Theme: default, sci-fi, fantasy, cyberpunk, custom
@@ -226,10 +233,12 @@ export let extensionSettings = {
     }, null, 2),
     // NOTE: level, classicStats, lastDiceRoll, showDiceDisplay, collapsedInventoryLocations,
     // inventoryViewModes archived to src/archived/archived-features-userstats.js
-    npcAvatars: {}, // Store custom avatar images for NPCs (key: character name, value: base64 data URI)
+    npcAvatars: {}, // Store custom avatar images for NPCs (key: character name, value: base64 data URI, cropped to 660x880)
+    npcAvatarsFullRes: {}, // Store original full-resolution avatar images (key: character name, value: base64 data URI)
     knownCharacters: {}, // Persistent roster of all characters ever seen (key: name, value: { emoji })
     removedCharacters: [], // Blacklist of character names explicitly removed by the user
     characterColors: {}, // Per-character dialogue colors (key: character name, value: hex color string e.g. "#C71585")
+    perChatCharacterTracking: false, // When true, knownCharacters/removedCharacters/characterColors are per-chat instead of global
     portraitAlignment: 'left', // Portrait bar alignment: 'left' (inline) or 'center'
     portraitPosition: 'above', // Portrait bar position: 'above', 'below', or 'top' (top of screen)
     portraitBarSettings: {
@@ -289,6 +298,7 @@ export let extensionSettings = {
         showRecentEvents: true,
         hudWidth: 220,                    // HUD panel width in px
         hudOpacity: 85,                   // HUD background opacity (0-100)
+        hudPosition: null,                // Saved drag position { left, top } in px, null = default top-right
     },
     ttsHighlightMode: 'off', // TTS sentence highlight: 'off' or 'highlight' (Gradient Glow Pill)
     ttsHighlightSettings: {
@@ -305,6 +315,8 @@ export let extensionSettings = {
     },
     // Portrait auto-import: match NPC names to SillyTavern character card avatars
     portraitAutoImport: true,
+    syncExpressionsToPresentCharacters: false, // Mirror ST Character Expressions into Present Characters portraits
+    hideDefaultExpressionDisplay: false, // Hide SillyTavern's built-in expression displays
     // Auto avatar generation settings
     autoGenerateAvatars: false, // Master toggle for auto-generating avatars
     avatarLLMCustomInstruction: '', // Custom instruction for LLM prompt generation
@@ -356,6 +368,11 @@ export let extensionSettings = {
         // Countdown speed by tension level (lower tension = faster countdown):
         // tension 1 → decrement by 3, tension 2 → by 2, tension 3-4 → by 1
         // tension 5-10 → resets streak entirely
+        // Advanced twist generation settings
+        twistContextMessages: 15,              // Number of recent chat messages included in twist prompt (1-30)
+        twistMessageTruncation: 1200,          // Max characters per message in twist prompt (200-3000)
+        twistInjectionDepth: 0,                // Insertion depth for the twist prompt (0 = bottom of context, higher = further back)
+        trapMode: false,                       // Silent mode: hides countdown, generates 1 twist, auto-injects without showing the user
     },
     // Preset management for tracker configurations
     presetManager: {
@@ -368,6 +385,9 @@ export let extensionSettings = {
         activePresetId: null,
         // Default preset ID (used when no character association exists)
         defaultPresetId: null
+    },
+    systemLog: {
+        maxEntries: 200,                       // Ring buffer size for captured console messages
     }
 };
 /**
@@ -403,6 +423,29 @@ export function getSessionAvatarPrompt(characterName) {
 }
 export function clearSessionAvatarPrompts() {
     sessionAvatarPrompts = {};
+}
+
+/**
+ * Session-only storage for Character Expressions portrait sync
+ * Maps character names to their last captured expression image URL
+ */
+export let syncedExpressionPortraits = {};
+export function setSyncedExpressionPortrait(characterName, src) {
+    if (!characterName || !src) return;
+    syncedExpressionPortraits[characterName] = src;
+}
+export function removeSyncedExpressionPortrait(characterName) {
+    if (!characterName) return;
+    delete syncedExpressionPortraits[characterName];
+}
+export function setSyncedExpressionPortraits(portraits) {
+    syncedExpressionPortraits = portraits && typeof portraits === 'object' ? { ...portraits } : {};
+}
+export function getSyncedExpressionPortrait(characterName) {
+    return syncedExpressionPortraits[characterName] || null;
+}
+export function clearSyncedExpressionPortraits() {
+    syncedExpressionPortraits = {};
 }
 /**
  * Tracks whether the last action was a swipe (for separate mode)

@@ -14,12 +14,13 @@
  */
 import { extensionSettings, lastGeneratedData, committedTrackerData, FALLBACK_AVATAR_DATA_URI } from '../../core/state.js';
 import { extensionFolderPath } from '../../core/config.js';
-import { saveSettings } from '../../core/persistence.js';
+import { saveSettings, getActiveKnownCharacters, getActiveRemovedCharacters, getActiveCharacterColors, saveCharacterRosterChange } from '../../core/persistence.js';
 import { callGenericPopup, POPUP_TYPE } from '../../../../../../popup.js';
 import { getBase64Async } from '../../../../../../utils.js';
-import { this_chid, characters } from '../../../../../../../script.js';
+import { this_chid, characters, chat_metadata } from '../../../../../../../script.js';
 import { selected_group, getGroupMembers } from '../../../../../../group-chats.js';
-import { getSafeThumbnailUrl } from '../../utils/avatars.js';
+import { getSafeThumbnailUrl, getExpressionAwarePortrait } from '../../utils/avatars.js';
+import { openCharacterSheet } from './characterSheet.js';
 
 /** Supported image extensions to probe for, in priority order */
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
@@ -29,7 +30,11 @@ const DIALOGUE_COLORS = [
     '#e94560', '#e07b39', '#f0c040', '#2ecc71',
     '#1abc9c', '#4a7ba7', '#9b59b6', '#e84393',
     '#5dade2', '#f39c12', '#8e44ad', '#d35400',
-    '#16a085', '#c0392b',
+    '#16a085', '#c0392b', '#00b894', '#6c5ce7',
+    '#fd79a8', '#a29bfe', '#55efc4', '#fab1a0',
+    '#74b9ff', '#ffeaa7', '#e17055', '#00cec9',
+    '#0984e3', '#fdcb6e', '#d63031', '#e056fd',
+    '#7ed6df', '#badc58',
 ];
 
 // ─────────────────────────────────────────────
@@ -175,6 +180,10 @@ export function initPortraitBar() {
                 <i class="fa-solid fa-eraser"></i> Clear Dialogue Color
             </div>
             <div class="dooms-pb-ctx-divider"></div>
+            <div class="dooms-pb-ctx-item" data-action="character-sheet">
+                <i class="fa-solid fa-scroll"></i> Character Sheet
+            </div>
+            <div class="dooms-pb-ctx-divider"></div>
             <div class="dooms-pb-ctx-item dooms-pb-ctx-danger" data-action="remove-character">
                 <i class="fa-solid fa-user-xmark"></i> Remove Character
             </div>
@@ -268,10 +277,13 @@ export function initPortraitBar() {
         $menu.find('[data-action="remove"]').toggle(!!hasCustomAvatar);
 
         // Set color picker to current character color (or default white)
-        const currentColor = extensionSettings.characterColors?.[characterName] || '#ffffff';
+        const ctxColors = getActiveCharacterColors();
+        const currentColor = ctxColors[characterName] || '#ffffff';
         $menu.find('#dooms-pb-color-input').val(currentColor);
         // Show or hide "Clear Dialogue Color" based on whether one is set
-        $menu.find('[data-action="clear-color"]').toggle(!!extensionSettings.characterColors?.[characterName]);
+        $menu.find('[data-action="clear-color"]').toggle(!!ctxColors[characterName]);
+        // Show "Character Sheet" only when Bunny Mo integration is enabled
+        $menu.find('[data-action="character-sheet"]').toggle(!!extensionSettings.bunnyMoIntegration);
 
         // Position near the cursor, clamped to viewport
         $menu.css({ display: 'block', top: 0, left: 0 });
@@ -315,6 +327,8 @@ export function initPortraitBar() {
             removeCharacter(characterName);
         } else if (action === 'clear-color') {
             clearCharacterColor(characterName);
+        } else if (action === 'character-sheet') {
+            openCharacterSheet(characterName);
         }
     });
 
@@ -330,7 +344,7 @@ export function initPortraitBar() {
     // ── Restore removed characters button ──
     $('#dooms-pb-restore-btn').on('click', function (e) {
         e.stopPropagation();
-        const removed = extensionSettings.removedCharacters || [];
+        const removed = getActiveRemovedCharacters();
         if (removed.length === 0) return;
 
         // Build a simple popup list
@@ -365,8 +379,9 @@ export function initPortraitBar() {
 
         // Restore all
         $popup.on('click', '.dooms-pb-restore-all-btn', function () {
-            extensionSettings.removedCharacters = [];
-            saveSettings();
+            const removedList = getActiveRemovedCharacters();
+            removedList.length = 0; // Clear in-place so the reference stays valid
+            saveCharacterRosterChange();
             $popup.remove();
             updatePortraitBar();
             console.log('[Dooms Portrait Bar] All removed characters restored');
@@ -417,7 +432,7 @@ export function updatePortraitBar() {
     $('#dooms-pb-count').text(countText);
 
     // Show/hide restore button based on whether there are removed characters
-    const removedCount = (extensionSettings.removedCharacters || []).length;
+    const removedCount = getActiveRemovedCharacters().length;
     $('#dooms-pb-restore-btn').toggle(removedCount > 0)
         .attr('title', `Restore removed characters (${removedCount})`);
 
@@ -440,22 +455,22 @@ export function updatePortraitBar() {
     }
 
     // ── Auto-assign dialogue colors to characters that don't have one yet ──
-    if (!extensionSettings.characterColors) extensionSettings.characterColors = {};
-    const usedColors = new Set(Object.values(extensionSettings.characterColors));
+    const activeColors = getActiveCharacterColors();
+    const usedColors = new Set(Object.values(activeColors));
     let colorsAssigned = false;
     for (const char of characters) {
-        if (!extensionSettings.characterColors[char.name]) {
+        if (!activeColors[char.name]) {
             // Pick the first unused palette color; fall back to random if all taken
             let color = DIALOGUE_COLORS.find(c => !usedColors.has(c));
             if (!color) {
                 color = DIALOGUE_COLORS[Math.floor(Math.random() * DIALOGUE_COLORS.length)];
             }
-            extensionSettings.characterColors[char.name] = color;
+            activeColors[char.name] = color;
             usedColors.add(color);
             colorsAssigned = true;
         }
     }
-    if (colorsAssigned) saveSettings();
+    if (colorsAssigned) saveCharacterRosterChange();
 
     const cards = characters.map((char, idx) => {
         const portraitSrc = resolvePortrait(char.name);
@@ -466,7 +481,7 @@ export function updatePortraitBar() {
         const nameEsc = escapeHtml(char.name);
         const emoji = char.emoji || '👤';
         const absentOverlay = char.present ? '' : '<div class="dooms-pb-absent-overlay"></div>';
-        const charColor = extensionSettings.characterColors?.[char.name];
+        const charColor = activeColors[char.name];
         const colorDot = charColor
             ? `<span class="dooms-portrait-card-color-dot" style="background:${charColor};"></span>`
             : '';
@@ -602,6 +617,9 @@ function namesMatch(cardName, aiName) {
 export function resolvePortrait(name) {
     if (!name) return null;
 
+    const syncedExpression = getExpressionAwarePortrait(name, null);
+    if (syncedExpression) return syncedExpression;
+
     // 1. Custom uploaded avatars (npcAvatars)
     const avatars = extensionSettings.npcAvatars;
     if (avatars) {
@@ -650,6 +668,76 @@ export function resolvePortrait(name) {
 
     // 3. Check file-based portraits/ folder
     return getPortraitFileUrl(name);
+}
+
+/**
+ * Returns a full-resolution portrait URL for a character.
+ * Same logic as resolvePortrait() but uses full-res avatar paths
+ * instead of thumbnails. Use this for character sheets and chat bubbles
+ * where image quality matters.
+ */
+export function resolveFullPortrait(name) {
+    if (!name) return null;
+
+    const syncedExpression = getExpressionAwarePortrait(name, null);
+    if (syncedExpression) return syncedExpression;
+
+    // 1. Try SillyTavern character card avatars first — these are full resolution
+    //    Preferred over npcAvatars which are cropped/downscaled to 330×440.
+    if (extensionSettings.portraitAutoImport !== false) {
+        try {
+            const findFullRes = (charList) => {
+                const match = charList?.find(c => c?.name && namesMatch(c.name, name));
+                if (match?.avatar && match.avatar !== 'none') {
+                    return `/characters/${encodeURIComponent(match.avatar)}`;
+                }
+                return null;
+            };
+
+            if (selected_group) {
+                const groupMembers = getGroupMembers(selected_group);
+                const url = findFullRes(groupMembers);
+                if (url) return url;
+            }
+            if (characters?.length) {
+                const url = findFullRes(characters);
+                if (url) return url;
+            }
+            if (this_chid !== undefined && characters[this_chid]?.name &&
+                namesMatch(characters[this_chid].name, name)) {
+                return `/characters/${encodeURIComponent(characters[this_chid].avatar)}`;
+            }
+        } catch (e) {
+            console.warn('[Dooms Portrait Bar] Full-res avatar lookup failed:', e.message);
+        }
+    }
+
+    // 2. Full-res originals stored at upload time (pre-crop)
+    const fullRes = extensionSettings.npcAvatarsFullRes;
+    if (fullRes) {
+        if (fullRes[name]) return fullRes[name];
+        const lowerName = name.toLowerCase();
+        for (const key of Object.keys(fullRes)) {
+            if (key.toLowerCase().startsWith(lowerName + ' ')) {
+                return fullRes[key];
+            }
+        }
+    }
+
+    // 3. Cropped portraits (npcAvatars — 660×880 data URIs)
+    const avatars = extensionSettings.npcAvatars;
+    if (avatars) {
+        if (avatars[name]) return avatars[name];
+        const lowerName = name.toLowerCase();
+        for (const key of Object.keys(avatars)) {
+            if (key.toLowerCase().startsWith(lowerName + ' ')) {
+                return avatars[key];
+            }
+        }
+    }
+
+    // 3. Fall back to regular resolve (file-based portraits, thumbnails)
+    return resolvePortrait(name);
 }
 
 /**
@@ -750,18 +838,25 @@ function triggerPortraitUpload(characterName) {
                 return;
             }
 
-            // Upscale the cropped image to a consistent high-res size and re-encode as PNG.
+            // Upscale the cropped image to a high-res size and re-encode as PNG.
             // The built-in crop popup returns a low-res JPEG at the cropped pixel size,
             // so we redraw it onto a larger canvas for crisp portrait display.
-            const PORTRAIT_W = 330;
-            const PORTRAIT_H = 440;
+            const PORTRAIT_W = 660;
+            const PORTRAIT_H = 880;
             const hiResDataUrl = await upscaleImage(String(croppedImage), PORTRAIT_W, PORTRAIT_H);
 
-            // Store in npcAvatars (same store as thoughts panel)
+            // Store cropped portrait for portrait bar / chat bubbles
             if (!extensionSettings.npcAvatars) {
                 extensionSettings.npcAvatars = {};
             }
             extensionSettings.npcAvatars[characterName] = hiResDataUrl;
+
+            // Store the original full-res image (pre-crop) for character sheets
+            if (!extensionSettings.npcAvatarsFullRes) {
+                extensionSettings.npcAvatarsFullRes = {};
+            }
+            extensionSettings.npcAvatarsFullRes[characterName] = dataUrl;
+
             saveSettings();
 
             // Clear file cache so resolvePortrait picks up the new npcAvatar
@@ -792,6 +887,10 @@ function triggerPortraitUpload(characterName) {
 function removePortrait(characterName) {
     if (extensionSettings.npcAvatars && extensionSettings.npcAvatars[characterName]) {
         delete extensionSettings.npcAvatars[characterName];
+        // Also remove the full-res original if stored
+        if (extensionSettings.npcAvatarsFullRes && extensionSettings.npcAvatarsFullRes[characterName]) {
+            delete extensionSettings.npcAvatarsFullRes[characterName];
+        }
         saveSettings();
         portraitFileCache.delete(characterName);
         // Remove from no-portrait localStorage cache so file probing can resume for this character
@@ -808,11 +907,9 @@ function removePortrait(characterName) {
  * Sets a character's dialogue color.
  */
 function setCharacterColor(characterName, color) {
-    if (!extensionSettings.characterColors) {
-        extensionSettings.characterColors = {};
-    }
-    extensionSettings.characterColors[characterName] = color;
-    saveSettings();
+    const colors = getActiveCharacterColors();
+    colors[characterName] = color;
+    saveCharacterRosterChange();
     updatePortraitBar();
     console.log(`[Dooms Tracker] Dialogue color set for ${characterName}: ${color}`);
 }
@@ -821,9 +918,10 @@ function setCharacterColor(characterName, color) {
  * Clears a character's dialogue color (AI will pick its own).
  */
 function clearCharacterColor(characterName) {
-    if (extensionSettings.characterColors && extensionSettings.characterColors[characterName]) {
-        delete extensionSettings.characterColors[characterName];
-        saveSettings();
+    const colors = getActiveCharacterColors();
+    if (colors[characterName]) {
+        delete colors[characterName];
+        saveCharacterRosterChange();
         updatePortraitBar();
         console.log(`[Dooms Tracker] Dialogue color cleared for ${characterName}`);
     }
@@ -833,42 +931,43 @@ function clearCharacterColor(characterName) {
  * Removes a character from the known-characters roster (and their portrait if any).
  */
 function restoreCharacter(characterName) {
-    if (!extensionSettings.removedCharacters) return;
+    const removedList = getActiveRemovedCharacters();
+    if (removedList.length === 0) return;
     const lowerName = characterName.toLowerCase();
-    extensionSettings.removedCharacters = extensionSettings.removedCharacters.filter(
-        n => n.toLowerCase() !== lowerName
-    );
+    // Remove in-place so the accessor's returned reference stays valid
+    // regardless of whether it points to per-chat or global storage.
+    for (let i = removedList.length - 1; i >= 0; i--) {
+        if (removedList[i].toLowerCase() === lowerName) {
+            removedList.splice(i, 1);
+        }
+    }
     // Clear the no-portrait cache so file probing can resume
     portraitFileCache.delete(characterName);
     try {
         const noPortrait = JSON.parse(localStorage.getItem('dooms-portrait-no-file') || '[]');
         localStorage.setItem('dooms-portrait-no-file', JSON.stringify(noPortrait.filter(n => n !== characterName)));
     } catch (e) { /* ignore */ }
-    saveSettings();
+    saveCharacterRosterChange();
     updatePortraitBar();
     console.log(`[Dooms Portrait Bar] Character restored: ${characterName}`);
 }
 
 function removeCharacter(characterName) {
     // Add to removed-characters blacklist so getCharacterList() filters them out
-    if (!extensionSettings.removedCharacters) {
-        extensionSettings.removedCharacters = [];
-    }
-    if (!extensionSettings.removedCharacters.includes(characterName)) {
-        extensionSettings.removedCharacters.push(characterName);
+    const removedList = getActiveRemovedCharacters();
+    if (!removedList.includes(characterName)) {
+        removedList.push(characterName);
     }
     // Remove from known characters roster (case-insensitive — AI name variants)
-    if (extensionSettings.knownCharacters) {
-        const lowerName = characterName.toLowerCase();
-        for (const key of Object.keys(extensionSettings.knownCharacters)) {
-            if (key.toLowerCase() === lowerName) {
-                delete extensionSettings.knownCharacters[key];
-            }
+    const knownChars = getActiveKnownCharacters();
+    const lowerName = characterName.toLowerCase();
+    for (const key of Object.keys(knownChars)) {
+        if (key.toLowerCase() === lowerName) {
+            delete knownChars[key];
         }
     }
     // Also remove their portrait if one exists (case-insensitive)
     if (extensionSettings.npcAvatars) {
-        const lowerName = characterName.toLowerCase();
         for (const key of Object.keys(extensionSettings.npcAvatars)) {
             if (key.toLowerCase() === lowerName) {
                 delete extensionSettings.npcAvatars[key];
@@ -878,7 +977,11 @@ function removeCharacter(characterName) {
     // Remove from entrance animation tracking so they don't re-trigger
     _previousCharacterNames.delete(characterName);
     portraitFileCache.delete(characterName);
-    saveSettings();
+    saveCharacterRosterChange();
+    // Also save global settings for npcAvatars removal
+    if (extensionSettings.perChatCharacterTracking) {
+        saveSettings();
+    }
     updatePortraitBar();
     console.log(`[Dooms Tracker] Character removed from roster: ${characterName}`);
 }
@@ -943,7 +1046,7 @@ export function getCharacterList() {
 
     // Filter out characters the user has explicitly removed
     // Case-insensitive matching — AI may output name variants between generations
-    const removed = extensionSettings.removedCharacters || [];
+    const removed = getActiveRemovedCharacters();
     const removedLower = new Set(removed.map(n => n.toLowerCase()));
     const beforeRemoval = presentChars.length;
     presentChars = presentChars.filter(c => {
@@ -958,27 +1061,25 @@ export function getCharacterList() {
     }
 
     // Update the persistent known-characters roster
-    if (!extensionSettings.knownCharacters) {
-        extensionSettings.knownCharacters = {};
-    }
+    const knownChars = getActiveKnownCharacters();
     let rosterChanged = false;
     for (const char of presentChars) {
-        if (!extensionSettings.knownCharacters[char.name]) {
-            extensionSettings.knownCharacters[char.name] = { emoji: char.emoji };
+        if (!knownChars[char.name]) {
+            knownChars[char.name] = { emoji: char.emoji };
             rosterChanged = true;
-        } else if (extensionSettings.knownCharacters[char.name].emoji !== char.emoji) {
-            extensionSettings.knownCharacters[char.name].emoji = char.emoji;
+        } else if (knownChars[char.name].emoji !== char.emoji) {
+            knownChars[char.name].emoji = char.emoji;
             rosterChanged = true;
         }
     }
     if (rosterChanged) {
-        saveSettings();
+        saveCharacterRosterChange();
     }
 
     // Build absent list from known characters not currently present
     const presentNames = new Set(presentChars.map(c => c.name));
     const absentChars = [];
-    for (const [name, info] of Object.entries(extensionSettings.knownCharacters)) {
+    for (const [name, info] of Object.entries(knownChars)) {
         if (!presentNames.has(name) && !removedLower.has(name.toLowerCase())) {
             absentChars.push({ name, emoji: info.emoji || '👤', present: false });
         }

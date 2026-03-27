@@ -17,7 +17,7 @@
         <div class="rpg-settings-popup-body">
 
             <!-- ═══════ GENERATION ═══════ -->
-            <div class="rpg-accordion-section rpg-accordion-open" data-accordion="generation">
+            <div class="rpg-accordion-section" data-accordion="generation">
                 <div class="rpg-accordion-header">
                     <i class="fa-solid fa-gears rpg-accordion-icon"></i>
                     <span class="rpg-accordion-title">Generation</span>
@@ -357,6 +357,48 @@
                             <span class="rpg-toggle-slider"></span>
                         </label>
                     </div>
+                    <div class="rpg-setting-row">
+                        <div class="rpg-setting-label-group">
+                            <span class="rpg-setting-label">Sync Character Expressions</span>
+                            <span class="rpg-setting-hint">Update Present Characters to each speaker's current SillyTavern expression and keep it until they speak again</span>
+                        </div>
+                        <label class="rpg-toggle-switch">
+                            <input type="checkbox" id="rpg-pb-sync-expressions" />
+                            <span class="rpg-toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="rpg-setting-row">
+                        <div class="rpg-setting-label-group">
+                            <span class="rpg-setting-label">Hide Default Expression Display</span>
+                            <span class="rpg-setting-hint">Hide SillyTavern's built-in expression displays</span>
+                        </div>
+                        <label class="rpg-toggle-switch">
+                            <input type="checkbox" id="rpg-pb-hide-default-expressions" />
+                            <span class="rpg-toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="rpg-setting-row">
+                        <div class="rpg-setting-label-group">
+                            <span class="rpg-setting-label">Per-Chat Character Tracking</span>
+                            <span class="rpg-setting-hint">Characters and removed list are tracked per-chat instead of globally</span>
+                        </div>
+                        <label class="rpg-toggle-switch">
+                            <input type="checkbox" id="rpg-pb-per-chat-tracking" />
+                            <span class="rpg-toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="rpg-subsection-label">Portraits</div>
+                    <div class="rpg-setting-row">
+                        <div class="rpg-setting-label-group">
+                            <span class="rpg-setting-label">Export Portraits</span>
+                            <span class="rpg-setting-hint">Download all uploaded character portraits as individual image files in a zip</span>
+                        </div>
+                        <button id="rpg-export-portraits" class="rpg-accordion-action-btn" type="button">
+                            <i class="fa-solid fa-download"></i> Export
+                        </button>
+                    </div>
 
                     <div class="rpg-subsection-label">Card Size</div>
                     <div class="rpg-setting-row">
@@ -479,6 +521,10 @@
                     <i class="fa-solid fa-chevron-down rpg-accordion-chevron"></i>
                 </div>
                 <div class="rpg-accordion-body">
+                    <div class="rpg-dc-api-warning" style="margin-bottom: 10px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <strong>Deprecated.</strong> This feature is no longer being actively developed. It remains available in case someone would like to pick up where development left off.
+                    </div>
                     <div class="rpg-setting-row">
                         <div class="rpg-setting-label-group">
                             <span class="rpg-setting-label">Mode</span>
@@ -817,6 +863,65 @@
                 </div>
             </div>
 
+            <!-- ═══════ BUNNY MO INTEGRATION ═══════ -->
+            <div class="rpg-accordion-section" data-accordion="bunny-mo">
+                <div class="rpg-accordion-header">
+                    <i class="fa-solid fa-carrot rpg-accordion-icon"></i>
+                    <span class="rpg-accordion-title">Bunny Mo Integration</span>
+                    <span class="rpg-accordion-badge" id="rpg-bm-badge">off</span>
+                    <i class="fa-solid fa-chevron-down rpg-accordion-chevron"></i>
+                </div>
+                <div class="rpg-accordion-body">
+                    <div class="rpg-setting-row">
+                        <div class="rpg-setting-label-group">
+                            <span class="rpg-setting-label">Enable Bunny Mo Integration</span>
+                            <span class="rpg-setting-hint">Adds Character Sheet support to Present Characters. Use Bunny Mo's !fullsheet command to generate a sheet, then import it via the scroll button on the message.</span>
+                        </div>
+                        <label class="rpg-toggle-switch">
+                            <input type="checkbox" id="rpg-toggle-bunny-mo" />
+                            <span class="rpg-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════ INLINE BANNERS ═══════ -->
+            <div class="rpg-accordion-section" data-accordion="inline-banners">
+                <div class="rpg-accordion-header">
+                    <i class="fa-solid fa-film rpg-accordion-icon"></i>
+                    <span class="rpg-accordion-title">Inline Banners</span>
+                    <span class="rpg-accordion-badge" id="rpg-ib-badge">off</span>
+                    <i class="fa-solid fa-chevron-down rpg-accordion-chevron"></i>
+                </div>
+                <div class="rpg-accordion-body">
+                    <div class="rpg-setting-row">
+                        <div class="rpg-setting-label-group">
+                            <span class="rpg-setting-label">Enable Inline Banners</span>
+                            <span class="rpg-setting-hint">Show cinematic transition cards in the chat when the story moves to a new location or makes a time jump between messages. No API calls — reads existing tracker data.</span>
+                        </div>
+                        <label class="rpg-toggle-switch">
+                            <input type="checkbox" id="rpg-ib-toggle" />
+                            <span class="rpg-toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="rpg-ib-options">
+                        <div class="rpg-subsection-label">Style</div>
+                        <div class="rpg-setting-row">
+                            <div class="rpg-setting-label-group">
+                                <span class="rpg-setting-label">Banner Style</span>
+                                <span class="rpg-setting-hint">Choose how transition cards look between messages</span>
+                            </div>
+                            <select id="rpg-ib-style" class="rpg-accordion-select">
+                                <option value="cinematic">Cinematic (Full-Width Banner)</option>
+                                <option value="minimal">Minimal (Centered Lines)</option>
+                                <option value="hybrid">Hybrid (Rounded Pill)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ═══════ DOOM COUNTER ═══════ -->
             <div class="rpg-accordion-section" data-accordion="doom-counter">
                 <div class="rpg-accordion-header">
@@ -890,6 +995,17 @@
                             </select>
                         </div>
 
+                        <div class="rpg-setting-row">
+                            <div class="rpg-setting-label-group">
+                                <span class="rpg-setting-label">Trap Mode</span>
+                                <span class="rpg-setting-hint">Silent mode — hides the countdown and debug badge from view. When the counter triggers, it generates one twist and injects it without showing you what it picked. You won't know it's coming.</span>
+                            </div>
+                            <label class="rpg-toggle-switch">
+                                <input type="checkbox" id="rpg-dc-trap-mode" />
+                                <span class="rpg-toggle-slider"></span>
+                            </label>
+                        </div>
+
                         <div class="rpg-subsection-label">Speed Rules</div>
                         <div class="rpg-setting-row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
                             <span class="rpg-setting-hint" style="font-size: 0.78em; opacity: 0.7;">
@@ -913,6 +1029,42 @@
                         <div class="rpg-setting-row" id="rpg-dc-countdown-display" style="display:none;">
                             <span class="rpg-setting-label">Countdown</span>
                             <span class="rpg-setting-hint" id="rpg-dc-countdown-current">3</span>
+                        </div>
+
+                        <div class="rpg-subsection-label rpg-dc-advanced-toggle" style="cursor: pointer; user-select: none;">
+                            Advanced <i class="fa-solid fa-chevron-down rpg-dc-advanced-chevron" style="font-size: 0.7em; margin-left: 4px; transition: transform 0.2s;"></i>
+                        </div>
+                        <div class="rpg-dc-advanced-body" style="display: none;">
+                            <div class="rpg-setting-row">
+                                <div class="rpg-setting-label-group">
+                                    <span class="rpg-setting-label">Context Messages</span>
+                                    <span class="rpg-setting-hint">How many recent chat messages are sent to the AI when generating twist options. More messages = better context awareness but higher token cost. Increase this if twists don't reflect recent events.</span>
+                                </div>
+                                <div class="rpg-slider-group">
+                                    <input type="range" id="rpg-dc-context-messages" class="rpg-range-slider" min="5" max="30" value="15" />
+                                    <span id="rpg-dc-context-messages-value" class="rpg-slider-value">15</span>
+                                </div>
+                            </div>
+                            <div class="rpg-setting-row">
+                                <div class="rpg-setting-label-group">
+                                    <span class="rpg-setting-label">Message Truncation</span>
+                                    <span class="rpg-setting-hint">Maximum characters kept from each message in the twist prompt. Higher = the AI sees more of each message (important for long prose). Lower = saves tokens. If twists ignore recent physical actions or dialogue, increase this.</span>
+                                </div>
+                                <div class="rpg-slider-group">
+                                    <input type="range" id="rpg-dc-msg-truncation" class="rpg-range-slider" min="200" max="3000" step="100" value="1200" />
+                                    <span id="rpg-dc-msg-truncation-value" class="rpg-slider-value">1200</span>
+                                </div>
+                            </div>
+                            <div class="rpg-setting-row">
+                                <div class="rpg-setting-label-group">
+                                    <span class="rpg-setting-label">Twist Injection Depth</span>
+                                    <span class="rpg-setting-hint">Where the chosen twist is inserted into the prompt context. 0 = at the very bottom (closest to the AI's next response). Higher values push it further back in the conversation history. Increase if the AI ignores the twist or treats it as old context.</span>
+                                </div>
+                                <div class="rpg-slider-group">
+                                    <input type="range" id="rpg-dc-injection-depth" class="rpg-range-slider" min="0" max="10" value="0" />
+                                    <span id="rpg-dc-injection-depth-value" class="rpg-slider-value">0</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="rpg-subsection-label">Debug</div>
@@ -1166,6 +1318,88 @@
                 </div>
             </div>
 
+            <!-- Log buttons (below all accordion sections) -->
+            <div style="margin-top: 12px; padding: 0 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+                <button id="rpg-open-system-log" class="rpg-accordion-action-btn" type="button">
+                    <i class="fa-solid fa-terminal"></i> System Log
+                </button>
+                <button id="rpg-open-notification-log" class="rpg-accordion-action-btn" type="button">
+                    <i class="fa-solid fa-bell"></i> Notification Log
+                </button>
+            </div>
+            <p class="rpg-note-text" style="margin-top:4px; padding: 0 8px;">View extension and SillyTavern messages for troubleshooting.</p>
+
+        </div>
+    </div>
+</div>
+
+<!-- System Log Modal -->
+<div id="rpg-system-log-popup" class="rpg-settings-popup" role="dialog" aria-modal="true"
+    aria-labelledby="rpg-system-log-title" style="display: none;">
+    <div class="rpg-settings-popup-content" style="max-width: 720px;">
+        <header class="rpg-settings-popup-header">
+            <h3 id="rpg-system-log-title">
+                <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                <span>System Log</span>
+            </h3>
+            <button id="rpg-close-system-log" class="rpg-popup-close" type="button">&times;</button>
+        </header>
+        <div class="rpg-settings-popup-body" style="padding: 0;">
+            <div class="rpg-system-log-entries"></div>
+        </div>
+        <footer class="rpg-settings-popup-footer">
+            <button id="rpg-system-log-copy" class="rpg-accordion-action-btn" type="button">
+                <i class="fa-solid fa-copy"></i> Copy All
+            </button>
+            <button id="rpg-system-log-clear" class="rpg-accordion-action-btn rpg-btn-danger" type="button">
+                <i class="fa-solid fa-trash"></i> Clear
+            </button>
+        </footer>
+    </div>
+</div>
+
+<!-- Notification Log Modal -->
+<div id="rpg-notification-log-popup" class="rpg-settings-popup" role="dialog" aria-modal="true"
+    aria-labelledby="rpg-notification-log-title" style="display: none;">
+    <div class="rpg-settings-popup-content" style="max-width: 720px;">
+        <header class="rpg-settings-popup-header">
+            <h3 id="rpg-notification-log-title">
+                <i class="fa-solid fa-bell" aria-hidden="true"></i>
+                <span>Notification Log</span>
+            </h3>
+            <button id="rpg-close-notification-log" class="rpg-popup-close" type="button">&times;</button>
+        </header>
+        <div class="rpg-settings-popup-body" style="padding: 0;">
+            <div class="rpg-notification-log-entries"></div>
+        </div>
+        <footer class="rpg-settings-popup-footer">
+            <button id="rpg-notification-log-copy" class="rpg-accordion-action-btn" type="button">
+                <i class="fa-solid fa-copy"></i> Copy All
+            </button>
+            <button id="rpg-notification-log-clear" class="rpg-accordion-action-btn rpg-btn-danger" type="button">
+                <i class="fa-solid fa-trash"></i> Clear
+            </button>
+        </footer>
+    </div>
+</div>
+
+<!-- Character Sheet Modal -->
+<div id="rpg-character-sheet-popup" class="rpg-settings-popup" role="dialog" aria-modal="true"
+    aria-labelledby="rpg-character-sheet-title" style="display: none;">
+    <div class="rpg-settings-popup-content rpg-cs-content">
+        <div class="rpg-cs-hero">
+            <img class="rpg-cs-hero-art" alt="" />
+            <div class="rpg-cs-hero-gradient"></div>
+            <div class="rpg-cs-hero-name"></div>
+        </div>
+        <div class="rpg-cs-right">
+            <button id="rpg-close-character-sheet" class="rpg-popup-close" type="button">&times;</button>
+            <div class="rpg-cs-sections"></div>
+            <footer class="rpg-settings-popup-footer">
+                <button id="rpg-cs-copy" class="rpg-accordion-action-btn" type="button">
+                    <i class="fa-solid fa-copy"></i> Copy Sheet
+                </button>
+            </footer>
         </div>
     </div>
 </div>

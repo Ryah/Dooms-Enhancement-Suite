@@ -12,10 +12,129 @@
  *   - "ticker"   — collapsible bar pinned to top of chat
  */
 import { extensionSettings, lastGeneratedData, committedTrackerData } from '../../core/state.js';
-import { getDoomCounterState } from '../../core/persistence.js';
+import { getDoomCounterState, getActiveCharacterColors, saveSettings } from '../../core/persistence.js';
+import { chat } from '../../../../../../../script.js';
 
 /** Cache of last rendered scene data JSON to skip redundant DOM rebuilds */
 let _lastSceneDataJSON = null;
+
+/** Active HUD drag cleanup function (called when HUD is removed) */
+let _hudDragCleanup = null;
+
+/**
+ * Makes the HUD panel draggable with mouse and touch support.
+ * Saves position to extensionSettings.infoPanelSettings.hudPosition.
+ */
+function initHudDrag() {
+    const $hud = $('.dooms-info-hud');
+    if (!$hud.length) return;
+
+    // Restore saved position
+    const saved = extensionSettings.infoPanelSettings?.hudPosition;
+    if (saved) {
+        $hud.css({ left: saved.left + 'px', top: saved.top + 'px', right: 'auto' });
+    }
+
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let elemStartX = 0, elemStartY = 0;
+    let rafId = null;
+    let pendingX = null, pendingY = null;
+    const MOVE_THRESHOLD = 5;
+
+    function updatePosition() {
+        if (pendingX !== null && pendingY !== null) {
+            $hud.css({ left: pendingX + 'px', top: pendingY + 'px', right: 'auto' });
+            pendingX = null;
+            pendingY = null;
+        }
+        rafId = null;
+    }
+
+    function clamp(x, y) {
+        const w = $hud.outerWidth();
+        const h = $hud.outerHeight();
+        return {
+            x: Math.max(0, Math.min(window.innerWidth - w, x)),
+            y: Math.max(0, Math.min(window.innerHeight - h, y))
+        };
+    }
+
+    function onPointerDown(clientX, clientY) {
+        startX = clientX;
+        startY = clientY;
+        const rect = $hud[0].getBoundingClientRect();
+        elemStartX = rect.left;
+        elemStartY = rect.top;
+        isDragging = false;
+    }
+
+    function onPointerMove(clientX, clientY, e) {
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+        if (!isDragging && Math.sqrt(dx * dx + dy * dy) < MOVE_THRESHOLD) return;
+        if (!isDragging) {
+            isDragging = true;
+            $hud.addClass('dragging');
+        }
+        if (e) e.preventDefault();
+        const clamped = clamp(elemStartX + dx, elemStartY + dy);
+        pendingX = clamped.x;
+        pendingY = clamped.y;
+        if (!rafId) rafId = requestAnimationFrame(updatePosition);
+    }
+
+    function onPointerUp() {
+        if (isDragging) {
+            const rect = $hud[0].getBoundingClientRect();
+            if (!extensionSettings.infoPanelSettings) extensionSettings.infoPanelSettings = {};
+            extensionSettings.infoPanelSettings.hudPosition = {
+                left: Math.round(rect.left),
+                top: Math.round(rect.top)
+            };
+            saveSettings();
+            setTimeout(() => $hud.removeClass('dragging'), 50);
+            isDragging = false;
+        }
+    }
+
+    // Mouse events
+    function onMouseDown(e) {
+        e.preventDefault();
+        onPointerDown(e.clientX, e.clientY);
+        $(document).on('mousemove.hudDrag', onMouseMove);
+        $(document).on('mouseup.hudDrag', onMouseUp);
+    }
+    function onMouseMove(e) { onPointerMove(e.clientX, e.clientY, e); }
+    function onMouseUp(e) {
+        $(document).off('mousemove.hudDrag mouseup.hudDrag');
+        onPointerUp();
+    }
+
+    // Touch events
+    function onTouchStart(e) {
+        const t = e.originalEvent.touches[0];
+        onPointerDown(t.clientX, t.clientY);
+    }
+    function onTouchMove(e) {
+        const t = e.originalEvent.touches[0];
+        onPointerMove(t.clientX, t.clientY, e);
+    }
+    function onTouchEnd() { onPointerUp(); }
+
+    $hud.on('mousedown.hudDrag', onMouseDown);
+    $hud.on('touchstart.hudDrag', onTouchStart);
+    $hud.on('touchmove.hudDrag', onTouchMove);
+    $hud.on('touchend.hudDrag', onTouchEnd);
+
+    // Return cleanup function
+    _hudDragCleanup = () => {
+        $hud.off('.hudDrag');
+        $(document).off('.hudDrag');
+        if (rafId) cancelAnimationFrame(rafId);
+        _hudDragCleanup = null;
+    };
+}
 
 /**
  * Theme color palettes — exact values from the CSS popup theme blocks
@@ -178,14 +297,15 @@ export function resetSceneHeaderCache() {
 // ─────────────────────────────────────────────
 
 function getCharacterColor(name) {
-    return extensionSettings.characterColors?.[name] || null;
+    return getActiveCharacterColors()[name] || null;
 }
 
 /**
  * Removes all scene header / info panel elements from the DOM.
  */
 function removeAllSceneElements() {
-    $('.dooms-scene-header, .dooms-info-banner, .dooms-info-hud, .dooms-info-ticker-wrapper').remove();
+    if (_hudDragCleanup) _hudDragCleanup();
+    $('.dooms-scene-header, .dooms-info-banner, .dooms-info-hud, .dooms-info-ticker-wrapper, .dooms-scene-transition').remove();
     $('#dooms-ticker-rotate-style').remove();
     $('#chat').removeClass('dooms-ticker-active dooms-ticker-bottom-active');
 }
@@ -205,6 +325,112 @@ function findLastAssistantMessage() {
 // ─────────────────────────────────────────────
 //  Main entry point
 // ─────────────────────────────────────────────
+
+/**
+ * Extracts a location string from an infoBox, handling both flat strings and nested objects.
+ */
+function extractLocationString(infoBox) {
+    if (!infoBox) return '';
+    const loc = infoBox.location;
+    if (!loc) return '';
+    if (typeof loc === 'string') return loc.trim();
+    if (typeof loc === 'object') return (loc.value || '').trim();
+    return '';
+}
+
+/**
+ * Extracts a time string from an infoBox, handling both flat strings and nested objects.
+ */
+function extractTimeString(infoBox) {
+    if (!infoBox) return '';
+    const t = infoBox.time;
+    if (!t) return '';
+    if (typeof t === 'string') return t.trim();
+    if (typeof t === 'object') {
+        if (t.start) return `${t.start}${t.end ? ' → ' + t.end : ''}`;
+        return (t.value || '').trim();
+    }
+    return '';
+}
+
+/**
+ * Builds the HTML for a transition card based on the selected style.
+ */
+function buildTransitionCard(style, location, time, locationChanged, timeChanged) {
+    const locHTML = locationChanged ? `<div class="dooms-scene-transition-location">${location}</div>` : '';
+    const timeHTML = timeChanged ? `<div class="dooms-scene-transition-time">${time}</div>` : '';
+    const styleVars = buildStyleVars();
+
+    if (style === 'cinematic') {
+        return `<div class="dooms-scene-transition dooms-transition-cinematic" style="${styleVars}">${locHTML}${timeHTML}</div>`;
+    } else if (style === 'minimal') {
+        return `<div class="dooms-scene-transition dooms-transition-minimal" style="${styleVars}"><div class="dooms-transition-line"></div>${locHTML}${timeHTML}<div class="dooms-transition-line"></div></div>`;
+    } else {
+        // hybrid (pill)
+        return `<div class="dooms-scene-transition dooms-transition-hybrid" style="${styleVars}">${locHTML}${timeHTML}</div>`;
+    }
+}
+
+/**
+ * Injects cinematic transition cards between messages where the location or time changed.
+ * Reads per-message tracker data from chat[].extra.dooms_tracker_swipes.
+ */
+function injectSceneTransitions() {
+    const ib = extensionSettings.inlineBanners || {};
+    if (!ib.enabled) return;
+
+    const style = ib.style || 'cinematic';
+
+    // Remove old transition cards first (idempotent)
+    $('.dooms-scene-transition').remove();
+
+    if (!chat || !Array.isArray(chat)) return;
+
+    const $messages = $('#chat .mes[is_system="false"]');
+    if (!$messages.length) return;
+
+    let prevLocation = '';
+    let prevTime = '';
+
+    $messages.each(function () {
+        const $mes = $(this);
+        const mesId = parseInt($mes.attr('mesid'), 10);
+        if (isNaN(mesId)) return;
+
+        const message = chat[mesId];
+        if (!message || message.is_user || message.is_system) return;
+
+        const swipeId = message.swipe_id || 0;
+        let swipeData = message.extra?.dooms_tracker_swipes?.[swipeId];
+        if (!swipeData && message.swipe_info?.[swipeId]?.extra?.dooms_tracker_swipes) {
+            swipeData = message.swipe_info[swipeId].extra.dooms_tracker_swipes[swipeId];
+        }
+
+        const infoBox = swipeData?.infoBox;
+        let parsedInfoBox = infoBox;
+        if (typeof infoBox === 'string') {
+            try { parsedInfoBox = JSON.parse(infoBox); } catch { parsedInfoBox = null; }
+        }
+
+        const curLocation = extractLocationString(parsedInfoBox);
+        const curTime = extractTimeString(parsedInfoBox);
+
+        // Only compare if we have a previous value (skip the first message)
+        if (prevLocation || prevTime) {
+            const locationChanged = curLocation && prevLocation && curLocation.toLowerCase() !== prevLocation.toLowerCase();
+            const timeChanged = curTime && prevTime && curTime !== prevTime;
+
+            if (locationChanged || timeChanged) {
+                const cardHTML = buildTransitionCard(style, curLocation, curTime, locationChanged, timeChanged);
+                $mes.before(cardHTML);
+            }
+        }
+
+        // Update previous values for next comparison
+        if (curLocation) prevLocation = curLocation;
+        if (curTime) prevTime = curTime;
+    });
+}
 
 /**
  * Main entry point. Removes old scene headers, finds the last assistant message,
@@ -238,7 +464,7 @@ export function updateChatSceneHeaders() {
     }
     // Skip rebuild if data + settings are identical to last render
     // Include doom counter state in cache key so badge updates when streak/countdown changes
-    const dcState = (extensionSettings.doomCounter?.enabled && extensionSettings.doomCounter?.debugDisplay) ? getDoomCounterState() : null;
+    const dcState = (extensionSettings.doomCounter?.enabled && extensionSettings.doomCounter?.debugDisplay && !extensionSettings.doomCounter?.trapMode) ? getDoomCounterState() : null;
     const cacheKey = JSON.stringify({ sceneData, st, dcState });
     if (cacheKey === _lastSceneDataJSON) {
         // Check if the element is still in the DOM
@@ -266,7 +492,10 @@ export function updateChatSceneHeaders() {
         }
     } else if (layout === 'hud') {
         const html = createHudHTML(sceneData);
-        if (html) $('#chat').prepend(html);
+        if (html) {
+            $('#chat').prepend(html);
+            initHudDrag();
+        }
     } else if (layout === 'ticker') {
         // Insert the ticker as a flex child of #sheld, directly before #chat.
         // This keeps it in the same stacking context as other extensions (e.g.
@@ -300,11 +529,21 @@ export function updateChatSceneHeaders() {
         }
     } else {
         // Classic layouts: grid, stacked, compact
+        // Insert inside .mes_block of the last assistant message so it
+        // aligns with inline thought bubbles (which live in .mes_text).
         const $target = findLastAssistantMessage();
         if (!$target) return;
         const headerHTML = createSceneHeaderHTML(sceneData);
-        $target.after(headerHTML);
+        const $mesBlock = $target.find('.mes_block');
+        if ($mesBlock.length) {
+            $mesBlock.append(headerHTML);
+        } else {
+            $target.after(headerHTML);
+        }
     }
+
+    // Inject scene transition cards between messages where location/time changed
+    injectSceneTransitions();
 }
 
 // ─────────────────────────────────────────────
@@ -1159,7 +1398,7 @@ function createTickerHTML(data) {
  */
 function buildDoomCounterBadge(doomTension) {
     const dc = extensionSettings.doomCounter;
-    if (!dc?.enabled || !dc?.debugDisplay) return '';
+    if (!dc?.enabled || !dc?.debugDisplay || dc?.trapMode) return '';
 
     const state = getDoomCounterState();
     const ceiling = dc.lowTensionCeiling || 4;

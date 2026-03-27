@@ -8,7 +8,8 @@
  * Original HTML is preserved in a data attribute for clean revert.
  */
 import { extensionSettings } from '../../core/state.js';
-import { resolvePortrait, getCharacterList } from '../ui/portraitBar.js';
+import { getActiveCharacterColors, getActiveKnownCharacters } from '../../core/persistence.js';
+import { resolvePortrait, resolveFullPortrait, getCharacterList } from '../ui/portraitBar.js';
 import { hexToRgb } from './sceneHeaders.js';
 import { executeSlashCommandsOnChatInput } from '../../../../../../../scripts/slash-commands.js';
 
@@ -40,8 +41,8 @@ function stripFontColors(html) {
  * Tries exact match first, then case-insensitive, then partial/substring match.
  */
 function getAssignedColor(speakerName) {
-    if (!speakerName || !extensionSettings.characterColors) return null;
-    const colors = extensionSettings.characterColors;
+    if (!speakerName) return null;
+    const colors = getActiveCharacterColors();
 
     // 1. Exact match
     if (colors[speakerName]) return colors[speakerName];
@@ -67,10 +68,9 @@ function getAssignedColor(speakerName) {
 /** Build a map from lowercase hex colour → character name */
 function buildColorToSpeakerMap() {
     const map = new Map();
-    if (extensionSettings.characterColors) {
-        for (const [name, color] of Object.entries(extensionSettings.characterColors)) {
-            if (color) map.set(color.toLowerCase(), name);
-        }
+    const colors = getActiveCharacterColors();
+    for (const [name, color] of Object.entries(colors)) {
+        if (color) map.set(color.toLowerCase(), name);
     }
     return map;
 }
@@ -391,8 +391,8 @@ function getAvatarHtml(speakerName, prefix) {
         return `<div class="${prefix}-avatar-letter">\u{1F4D6}</div>`;
     }
 
-    const portraitSrc = resolvePortrait(speakerName);
-    const emoji = extensionSettings.knownCharacters?.[speakerName]?.emoji || '\u{1F464}';
+    const portraitSrc = resolveFullPortrait(speakerName);
+    const emoji = getActiveKnownCharacters()[speakerName]?.emoji || '\u{1F464}';
 
     if (portraitSrc) {
         return `<img src="${escapeHtml(portraitSrc)}" alt="${escapeHtml(speakerName)}"
@@ -635,10 +635,11 @@ function _injectBubbleAvatars(mesElement) {
         if (spaceNeeded > gutterWidth) {
             extraPadding = spaceNeeded - gutterWidth;
         }
-        // Avatar left: position so right edge = mesText left + extraPadding - gap
-        // i.e. avatar sits in the gutter, right edge is `gap` px before the (shifted) text
-        avatarLeft = gutterWidth - avatarSize - gap + extraPadding;
-        if (avatarLeft < 0) avatarLeft = 0;
+        // Center the avatar horizontally in the available gutter space.
+        // The gutter extends from the left edge of .mes to the left edge of .mes_text
+        // (plus any extra padding we added). Center the avatar within that total width.
+        const totalGutter = gutterWidth + extraPadding;
+        avatarLeft = Math.max(0, Math.round((totalGutter - avatarSize) / 2));
 
         // Apply the extra padding to .mes_text to push bubbles right
         mesText.style.paddingLeft = extraPadding > 0 ? extraPadding + 'px' : '';
@@ -649,8 +650,8 @@ function _injectBubbleAvatars(mesElement) {
         const speakerName = bubble.getAttribute('data-speaker');
         if (!speakerName) return;
 
-        const portraitSrc = resolvePortrait(speakerName);
-        const emoji = extensionSettings.knownCharacters?.[speakerName]?.emoji || '\u{1F464}';
+        const portraitSrc = resolveFullPortrait(speakerName);
+        const emoji = getActiveKnownCharacters()[speakerName]?.emoji || '\u{1F464}';
 
         // bubble.offsetTop gives position relative to .mes (our offsetParent).
         const topOffset = bubble.offsetTop;

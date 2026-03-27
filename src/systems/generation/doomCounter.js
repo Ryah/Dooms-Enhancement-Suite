@@ -179,6 +179,8 @@ export function resetCounters() {
     state.triggered = false;
     state.pendingTwist = null;
     setDoomCounterState(state);
+    // Remove any twist banners from the chat DOM
+    $('.dooms-dc-inline').remove();
 }
 
 // ─── Twist Generation ─────────────────────────────────────────────────────────
@@ -249,10 +251,13 @@ function buildTwistPrompt(twistCount) {
         }
     }
 
-    // ── Recent conversation (last 15 messages for richer context) ──
-    const recentChat = chatMessages.slice(-15).map(m => {
+    // ── Recent conversation (configurable message count and truncation) ──
+    const dc = extensionSettings.doomCounter || {};
+    const contextMessages = dc.twistContextMessages || 15;
+    const messageTruncation = dc.twistMessageTruncation || 1200;
+    const recentChat = chatMessages.slice(-contextMessages).map(m => {
         const role = m.is_user ? playerName : (m.name || aiCharName);
-        const text = (m.mes || '').substring(0, 600);
+        const text = (m.mes || '').substring(0, messageTruncation);
         return `${role}: ${text}`;
     }).join('\n');
 
@@ -368,7 +373,37 @@ export async function triggerDoomCounter() {
     }
     _triggerInProgress = true;
 
-    // ── Inject inline element into chat (loading state) ──────────────
+    // ── Trap Mode: silent trigger, 1 twist, auto-inject ──────────────
+    if (dc.trapMode) {
+        try {
+            console.log('[Doom Counter] Trap mode triggered — generating silent twist...');
+
+            const twists = await generateTwistOptions(1);
+            if (!twists || twists.length === 0) {
+                console.warn('[Doom Counter] Trap mode: no twists generated.');
+                return;
+            }
+
+            const chosen = twists[0];
+            const state = getDoomCounterState();
+            state.pendingTwist = chosen.description;
+            state.triggered = false;
+            state.lowStreakCount = 0;
+            state.countdownActive = false;
+            state.countdownCount = dc.countdownLength || 3;
+            setDoomCounterState(state);
+
+            console.log(`[Doom Counter] Trap mode twist silently injected: "${chosen.title}"`);
+            updateDoomCounterUI();
+        } catch (error) {
+            console.error('[Doom Counter] Trap mode error:', error);
+        } finally {
+            _triggerInProgress = false;
+        }
+        return;
+    }
+
+    // ── Normal Mode: visible trigger with card selection ──────────────
     const $inline = $(`
         <div class="dooms-dc-inline">
             <div class="dooms-dc-inline-header">
@@ -492,8 +527,23 @@ export function getPendingTwist() {
  * Clears the pending twist after it has been injected.
  * Called by injector.js after injection.
  */
+/** Flag set when a trap mode twist is being injected into the next generation */
+let _trapTwistPending = false;
+
+export function isTrapTwistPending() {
+    return _trapTwistPending;
+}
+
+export function clearTrapTwistFlag() {
+    _trapTwistPending = false;
+}
+
 export function clearPendingTwist() {
     const state = getDoomCounterState();
+    // If this was a trap mode twist, set the flag so the next message shows a badge
+    if (state.pendingTwist && extensionSettings.doomCounter?.trapMode) {
+        _trapTwistPending = true;
+    }
     state.pendingTwist = null;
     setDoomCounterState(state);
 }
@@ -530,6 +580,17 @@ export function updateDoomCounterUI() {
 
     const state = getDoomCounterState();
     const threshold = dc.lowTensionThreshold || 5;
+
+    // Trap mode: hide all status indicators
+    if (dc.trapMode) {
+        $('#rpg-dc-status').html('<span style="color: #666;">🪤 Trap mode — status hidden</span>');
+        $('#rpg-dc-streak').text('?');
+        $('#rpg-dc-streak-max').text('?');
+        $('#rpg-dc-countdown-display').hide();
+        $('#rpg-dc-badge').text('trap');
+        updateDoomDebugHud();
+        return;
+    }
 
     // Update streak display
     $('#rpg-dc-streak').text(state.lowStreakCount);

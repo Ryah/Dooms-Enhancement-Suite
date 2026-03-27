@@ -12,6 +12,7 @@ import {
     lastActionWasSwipe,
     setIsAwaitingNewMessage
 } from '../../core/state.js';
+import { getActiveCharacterColors } from '../../core/persistence.js';
 import { evaluateSuppression } from './suppression.js';
 import { parseQuests } from './parser.js';
 import { getPendingTwist, clearPendingTwist, buildDoomTensionInstruction, DOOM_TWIST_SLOT, DOOM_TENSION_SLOT } from './doomCounter.js';
@@ -159,7 +160,7 @@ export function clearBoostForAppearedFields() {
  * Returns an empty string if no colors are configured.
  */
 function buildColorAssignments() {
-    const colors = extensionSettings.characterColors;
+    const colors = getActiveCharacterColors();
     if (!colors || typeof colors !== 'object') return '';
     const entries = Object.entries(colors).filter(([, color]) => color);
     if (entries.length === 0) return '';
@@ -649,19 +650,20 @@ export async function onGenerationStarted(type, data, dryRun) {
     //    guided generations, but the twist is a one-shot user action, not a tracker.
     if (extensionSettings.doomCounter?.enabled) {
         const pendingTwist = getPendingTwist();
+        const twistDepth = extensionSettings.doomCounter?.twistInjectionDepth || 0;
         if (pendingTwist) {
             const twistTemplate = extensionSettings.customPlotTwistTemplatePrompt || DEFAULT_PLOT_TWIST_TEMPLATE_PROMPT;
             const twistPrompt = `\n${twistTemplate.replace('{twist}', pendingTwist)}\n`;
-            setExtensionPrompt(DOOM_TWIST_SLOT, twistPrompt, extension_prompt_types.IN_PROMPT, 0, false);
+            setExtensionPrompt(DOOM_TWIST_SLOT, twistPrompt, extension_prompt_types.IN_CHAT, twistDepth, false);
             // Clear the pending twist after injecting — it's a one-shot
             clearPendingTwist();
-            console.log('[Doom Counter] Twist injected into prompt.');
+            console.log(`[Doom Counter] Twist injected into prompt at depth ${twistDepth}.`);
         } else {
-            setExtensionPrompt(DOOM_TWIST_SLOT, '', extension_prompt_types.IN_PROMPT, 0, false);
+            setExtensionPrompt(DOOM_TWIST_SLOT, '', extension_prompt_types.IN_CHAT, twistDepth, false);
         }
     } else {
         // Clear twist slot if disabled
-        setExtensionPrompt(DOOM_TWIST_SLOT, '', extension_prompt_types.IN_PROMPT, 0, false);
+        setExtensionPrompt(DOOM_TWIST_SLOT, '', extension_prompt_types.IN_CHAT, 0, false);
     }
     // ──────────────────────────────────────────────────────────────────────────
 

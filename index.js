@@ -131,8 +131,22 @@ import {
     initHistoryInjection,
     initDoomCounterListener
 } from './src/systems/integration/sillytavern.js';
+import {
+    initExpressionSync,
+    queueExpressionCaptureForSpeaker,
+    syncExpressionFromLatestMessage,
+    onExpressionSyncSettingChanged,
+    onHideDefaultExpressionDisplaySettingChanged,
+    clearExpressionSyncCache,
+    onExpressionSyncChatChanged
+} from './src/systems/integration/expressionSync.js';
 // Doom Counter
-import { triggerDoomCounter, updateDoomCounterUI, resetCounters } from './src/systems/generation/doomCounter.js';
+import { triggerDoomCounter, updateDoomCounterUI, resetCounters, isTrapTwistPending, clearTrapTwistFlag } from './src/systems/generation/doomCounter.js';
+// System Log & Notification Log
+import { initSystemLog, openSystemLog } from './src/systems/ui/systemLog.js';
+import { initNotificationLog } from './src/systems/ui/notificationLog.js';
+// Character Sheet
+import { initCharacterSheet, importFullSheetFromMessage, messageHasFullSheet, injectFullSheetButtons, clearStatsCache } from './src/systems/ui/characterSheet.js';
 // ============ DEBUG: Module loaded successfully ============
 console.log('[Dooms Tracker] ✅ All imports resolved successfully. Module body executing.');
 /**
@@ -145,6 +159,9 @@ function updateDynamicLabels() {
  * Adds the extension settings to the Extensions tab.
  */
 async function addExtensionSettings() {
+    // Initialize log captures early so they catch all init messages
+    try { initSystemLog(); } catch(e) { console.error('[Dooms Tracker] initSystemLog() FAILED:', e); }
+    try { initNotificationLog(); } catch(e) { console.error('[Dooms Tracker] initNotificationLog() FAILED:', e); }
     console.log('[Dooms Tracker] addExtensionSettings() called');
     // Load the HTML template for the settings
     const settingsHtml = await renderExtensionTemplateAsync(extensionName, 'settings');
@@ -161,11 +178,18 @@ async function addExtensionSettings() {
             clearExtensionPrompts();
             updateChatThoughts(); // Remove thought bubbles
             updateChatSceneHeaders(); // Remove scene headers (handles enabled check internally)
+            clearExpressionSyncCache();
+            onHideDefaultExpressionDisplaySettingChanged(extensionSettings.hideDefaultExpressionDisplay);
         } else if (extensionSettings.enabled && !wasEnabled) {
             // Enabling extension - initialize UI
             await initUI();
             loadChatData(); // Load chat data for current chat
             updateChatThoughts(); // Create thought bubbles if data exists
+            onHideDefaultExpressionDisplaySettingChanged(extensionSettings.hideDefaultExpressionDisplay);
+            if (extensionSettings.syncExpressionsToPresentCharacters) {
+                initExpressionSync();
+                syncExpressionFromLatestMessage();
+            }
         }
     });
     // Set up language selector
@@ -388,6 +412,66 @@ async function initUI() {
     $('#rpg-pb-show-arrows').on('change', function() { _pbSettings().showScrollArrows = $(this).prop('checked'); _savePb(); });
     $('#rpg-pb-auto-import').on('change', function() { extensionSettings.portraitAutoImport = $(this).prop('checked'); saveSettings(); });
 
+    // Export portraits as individual image downloads
+    $('#rpg-export-portraits').on('click', async function() {
+        const avatars = extensionSettings.npcAvatars || {};
+        const fullRes = extensionSettings.npcAvatarsFullRes || {};
+        const names = Object.keys({ ...avatars, ...fullRes });
+        if (names.length === 0) {
+            toastr.info('No uploaded portraits to export.', '', { timeOut: 2000 });
+            return;
+        }
+        let exported = 0;
+        for (const name of names) {
+            // Prefer full-res, fall back to cropped
+            const dataUri = fullRes[name] || avatars[name];
+            if (!dataUri) continue;
+            try {
+                // Extract mime type and extension
+                const match = dataUri.match(/^data:image\/(\w+);base64,/);
+                const ext = match ? match[1].replace('jpeg', 'jpg') : 'png';
+                // Convert base64 to blob
+                const byteString = atob(dataUri.split(',')[1]);
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                const blob = new Blob([ab], { type: match ? `image/${match[1]}` : 'image/png' });
+                // Trigger download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                exported++;
+                // Small delay between downloads so browser doesn't block them
+                if (names.length > 1) await new Promise(r => setTimeout(r, 300));
+            } catch (e) {
+                console.error(`[Dooms Tracker] Failed to export portrait for ${name}:`, e);
+            }
+        }
+        toastr.success(`Exported ${exported} portrait${exported !== 1 ? 's' : ''}.`, '', { timeOut: 3000 });
+    });
+
+    $('#rpg-pb-sync-expressions').on('change', function() {
+        extensionSettings.syncExpressionsToPresentCharacters = $(this).prop('checked');
+        saveSettings();
+        onExpressionSyncSettingChanged(extensionSettings.syncExpressionsToPresentCharacters);
+    });
+    $('#rpg-pb-hide-default-expressions').on('change', function() {
+        extensionSettings.hideDefaultExpressionDisplay = $(this).prop('checked');
+        saveSettings();
+        onHideDefaultExpressionDisplaySettingChanged(extensionSettings.hideDefaultExpressionDisplay);
+    });
+    $('#rpg-pb-per-chat-tracking').on('change', function() {
+        extensionSettings.perChatCharacterTracking = $(this).prop('checked');
+        saveSettings();
+        loadChatData();
+        updatePortraitBar();
+    });
+
     // Card size sliders
     $('#rpg-pb-card-width').on('input', function() {
         const v = parseInt($(this).val());
@@ -604,7 +688,6 @@ async function initUI() {
         _syncOptionalField('weather', v);
         _saveSt();
     });
-
     // Layout
     $('#rpg-st-layout').on('change', function() {
         _stSettings().layout = $(this).val();
@@ -721,7 +804,38 @@ async function initUI() {
         updateChatSceneHeaders();
     });
 
+    // ── Bunny Mo Integration ──
+    $('#rpg-toggle-bunny-mo').on('change', function () {
+        extensionSettings.bunnyMoIntegration = $(this).prop('checked');
+        $('#rpg-bm-badge').text(extensionSettings.bunnyMoIntegration ? 'on' : 'off');
+        saveSettings();
+        if (extensionSettings.bunnyMoIntegration) {
+            setTimeout(() => injectFullSheetButtons(), 100);
+        }
+    });
+
     // ── Doom Counter customization ──
+    // ── Inline Banners ──
+    const _ibSettings = () => {
+        if (!extensionSettings.inlineBanners) extensionSettings.inlineBanners = {};
+        return extensionSettings.inlineBanners;
+    };
+
+    $('#rpg-ib-toggle').on('change', function () {
+        _ibSettings().enabled = $(this).prop('checked');
+        $('#rpg-ib-badge').text($(this).prop('checked') ? 'on' : 'off');
+        $('#rpg-ib-options').toggle($(this).prop('checked'));
+        saveSettings();
+        updateChatSceneHeaders();
+    });
+
+    $('#rpg-ib-style').on('change', function () {
+        _ibSettings().style = $(this).val();
+        saveSettings();
+        updateChatSceneHeaders();
+    });
+
+    // ── Doom Counter ──
     const _dcSettings = () => {
         if (!extensionSettings.doomCounter) extensionSettings.doomCounter = {};
         return extensionSettings.doomCounter;
@@ -759,6 +873,45 @@ async function initUI() {
 
     $('#rpg-dc-choices').on('change', function () {
         _dcSettings().twistChoiceCount = parseInt($(this).val());
+        saveSettings();
+    });
+
+    $('#rpg-dc-trap-mode').on('change', function () {
+        _dcSettings().trapMode = $(this).prop('checked');
+        saveSettings();
+        updateDoomCounterUI();
+        updateChatSceneHeaders();
+    });
+
+    // ── Advanced section toggle ──
+    $('.rpg-dc-advanced-toggle').on('click', function () {
+        const $body = $('.rpg-dc-advanced-body');
+        const $chevron = $(this).find('.rpg-dc-advanced-chevron');
+        $body.slideToggle(200);
+        $chevron.toggleClass('fa-chevron-down fa-chevron-up');
+    });
+
+    // ── Advanced: Context Messages ──
+    $('#rpg-dc-context-messages').on('input', function () {
+        const v = parseInt($(this).val());
+        _dcSettings().twistContextMessages = v;
+        $('#rpg-dc-context-messages-value').text(v);
+        saveSettings();
+    });
+
+    // ── Advanced: Message Truncation ──
+    $('#rpg-dc-msg-truncation').on('input', function () {
+        const v = parseInt($(this).val());
+        _dcSettings().twistMessageTruncation = v;
+        $('#rpg-dc-msg-truncation-value').text(v);
+        saveSettings();
+    });
+
+    // ── Advanced: Twist Injection Depth ──
+    $('#rpg-dc-injection-depth').on('input', function () {
+        const v = parseInt($(this).val());
+        _dcSettings().twistInjectionDepth = v;
+        $('#rpg-dc-injection-depth-value').text(v);
         saveSettings();
     });
 
@@ -1216,6 +1369,9 @@ async function initUI() {
     $('#rpg-pb-show-absent').prop('checked', pb.showAbsentCharacters !== false);
     $('#rpg-pb-show-arrows').prop('checked', pb.showScrollArrows !== false);
     $('#rpg-pb-auto-import').prop('checked', extensionSettings.portraitAutoImport !== false);
+    $('#rpg-pb-sync-expressions').prop('checked', extensionSettings.syncExpressionsToPresentCharacters === true);
+    $('#rpg-pb-hide-default-expressions').prop('checked', extensionSettings.hideDefaultExpressionDisplay === true);
+    $('#rpg-pb-per-chat-tracking').prop('checked', extensionSettings.perChatCharacterTracking === true);
     $('#rpg-pb-card-width').val(pb.cardWidth ?? 110);
     $('#rpg-pb-card-width-value').text((pb.cardWidth ?? 110) + 'px');
     $('#rpg-pb-card-height').val(pb.cardHeight ?? 150);
@@ -1347,6 +1503,17 @@ async function initUI() {
     $('#rpg-tts-unread-opacity-value').text((tts.unreadOpacity ?? 55) + '%');
     $('#rpg-tts-transition-speed').val(tts.transitionSpeed ?? 300);
     applyTtsHighlightSettings();
+    // Bunny Mo Integration
+    $('#rpg-toggle-bunny-mo').prop('checked', extensionSettings.bunnyMoIntegration || false);
+    $('#rpg-bm-badge').text(extensionSettings.bunnyMoIntegration ? 'on' : 'off');
+
+    // Inline Banners
+    const ib = extensionSettings.inlineBanners || {};
+    $('#rpg-ib-toggle').prop('checked', ib.enabled || false);
+    $('#rpg-ib-badge').text(ib.enabled ? 'on' : 'off');
+    $('#rpg-ib-options').toggle(ib.enabled || false);
+    $('#rpg-ib-style').val(ib.style || 'cinematic');
+
     // Doom Counter
     const dc = extensionSettings.doomCounter || {};
     $('#rpg-toggle-doom-counter').prop('checked', dc.enabled || false);
@@ -1360,6 +1527,13 @@ async function initUI() {
     $('#rpg-dc-countdown').val(dc.countdownLength || 3);
     $('#rpg-dc-countdown-value').text(dc.countdownLength || 3);
     $('#rpg-dc-choices').val(dc.twistChoiceCount || 3);
+    $('#rpg-dc-context-messages').val(dc.twistContextMessages || 15);
+    $('#rpg-dc-context-messages-value').text(dc.twistContextMessages || 15);
+    $('#rpg-dc-msg-truncation').val(dc.twistMessageTruncation || 1200);
+    $('#rpg-dc-msg-truncation-value').text(dc.twistMessageTruncation || 1200);
+    $('#rpg-dc-injection-depth').val(dc.twistInjectionDepth || 0);
+    $('#rpg-dc-injection-depth-value').text(dc.twistInjectionDepth || 0);
+    $('#rpg-dc-trap-mode').prop('checked', dc.trapMode || false);
     $('#rpg-dc-debug-display').prop('checked', dc.debugDisplay || false);
     updateDoomCounterUI();
     // Initialize Doom Counter toast button listener
@@ -1380,6 +1554,8 @@ async function initUI() {
     try { updateChatSceneHeaders(); console.log('[Dooms Tracker] updateChatSceneHeaders() OK'); } catch(e) { console.error('[Dooms Tracker] updateChatSceneHeaders() FAILED:', e); }
     // Info panel is now a scene tracker layout mode — no separate updateInfoPanel() needed
     try { initPortraitBar(); console.log('[Dooms Tracker] initPortraitBar() OK'); } catch(e) { console.error('[Dooms Tracker] initPortraitBar() FAILED:', e); }
+    try { initCharacterSheet(); console.log('[Dooms Tracker] initCharacterSheet() OK'); } catch(e) { console.error('[Dooms Tracker] initCharacterSheet() FAILED:', e); }
+    try { initExpressionSync(); console.log('[Dooms Tracker] initExpressionSync() OK'); } catch(e) { console.error('[Dooms Tracker] initExpressionSync() FAILED:', e); }
     try { initWeatherEffects(); console.log('[Dooms Tracker] initWeatherEffects() OK'); } catch(e) { console.error('[Dooms Tracker] initWeatherEffects() FAILED:', e); }
     // Add settings button as a fixed-position element on <body> so it's
     // always accessible even when the portrait bar is hidden
@@ -1616,7 +1792,7 @@ jQuery(async () => {
                 [event_types.MESSAGE_RECEIVED]: onMessageReceived,
                 [event_types.GENERATION_STOPPED]: onGenerationEnded,
                 [event_types.GENERATION_ENDED]: onGenerationEnded,
-                [event_types.CHAT_CHANGED]: [onCharacterChanged, updatePersonaAvatar, clearSessionAvatarPrompts, clearPortraitCache],
+                [event_types.CHAT_CHANGED]: [onCharacterChanged, updatePersonaAvatar, clearSessionAvatarPrompts, clearPortraitCache, clearExpressionSyncCache, clearStatsCache],
                 [event_types.MESSAGE_SWIPED]: onMessageSwiped,
                 [event_types.USER_MESSAGE_RENDERED]: updatePersonaAvatar,
                 [event_types.SETTINGS_UPDATED]: updatePersonaAvatar
@@ -1751,6 +1927,37 @@ jQuery(async () => {
                 }
                 // Update scene tracker (new data may be available after message render)
                 setTimeout(() => updateChatSceneHeaders(), 100);
+                // Show trap mode notification on the message that received the silent twist
+                if (isTrapTwistPending() && messageElement) {
+                    clearTrapTwistFlag();
+                    const $mes = $(messageElement);
+                    if (!$mes.find('.dooms-dc-trap-badge').length) {
+                        $mes.find('.mes_block').append(`
+                            <div class="dooms-dc-trap-badge" title="A hidden plot twist was woven into this response by the Doom Counter's Trap Mode">
+                                <i class="fa-solid fa-skull"></i> Trap triggered
+                            </div>
+                        `);
+                    }
+                }
+                const renderedMessage = chat[messageId];
+                if (renderedMessage && !renderedMessage.is_user && !renderedMessage.is_system) {
+                    queueExpressionCaptureForSpeaker(renderedMessage.name);
+                    // Add fullsheet import button if message contains fullsheet data and Bunny Mo integration is on
+                    if (extensionSettings.bunnyMoIntegration && messageHasFullSheet(renderedMessage.mes) && messageElement) {
+                        const $extraBtns = $(messageElement).find('.mes_buttons .extraMesButtons');
+                        if ($extraBtns.length && !$extraBtns.find('.dooms-import-fullsheet-btn').length) {
+                            $extraBtns.prepend(`<div class="dooms-import-fullsheet-btn mes_button fa-solid fa-scroll" title="Import Character Sheet"></div>`);
+                        }
+                    }
+                }
+            });
+            // ── Fullsheet import button click handler ──
+            $(document).on('click', '.dooms-import-fullsheet-btn', function (e) {
+                e.stopPropagation();
+                const messageId = $(this).closest('.mes').attr('mesid');
+                if (messageId !== undefined) {
+                    importFullSheetFromMessage(parseInt(messageId));
+                }
             });
             eventSource.on(event_types.USER_MESSAGE_RENDERED, (messageId) => {
                 if (!extensionSettings.enabled) return;
@@ -1769,7 +1976,10 @@ jQuery(async () => {
                 }
                 // Inject reasoning TTS buttons into all messages (deferred to idle)
                 (window.requestIdleCallback || requestAnimationFrame)(() => injectReasoningTtsButtons());
-                // Scene tracker re-render is handled by onCharacterChanged via CHAT_CHANGED
+                // Re-attach expression sync / native expression visibility after chat DOM rebuilds.
+                setTimeout(() => onExpressionSyncChatChanged(), 0);
+                // Inject fullsheet import buttons on existing messages
+                setTimeout(() => injectFullSheetButtons(), 200);
             });
             // TTS Highlight: clear all highlights when switching chats
             eventSource.on(event_types.CHAT_CHANGED, () => {
@@ -1800,6 +2010,18 @@ jQuery(async () => {
                 // Re-insert inline character thoughts (editing replaces .mes_text
                 // contents, destroying any previously appended thought elements)
                 setTimeout(() => updateChatThoughts(), 100);
+                const updatedMessage = chat[messageId];
+                if (updatedMessage && !updatedMessage.is_user && !updatedMessage.is_system) {
+                    queueExpressionCaptureForSpeaker(updatedMessage.name);
+                }
+            });
+            // MESSAGE_DELETED does not fire the same render/update hooks as swipes or edits.
+            // Reset Doom's transient expression-sync state so the observer doesn't keep
+            // attributing later ST expression changes to the speaker of the deleted message.
+            eventSource.on(event_types.MESSAGE_DELETED, () => {
+                if (!extensionSettings.enabled) return;
+                clearExpressionSyncCache();
+                setTimeout(() => onExpressionSyncChatChanged(), 0);
             });
             // MESSAGE_SWIPED fires when the user navigates between swipe variants.
             // SillyTavern replaces .mes_text with the new swipe content, destroying
@@ -1808,6 +2030,10 @@ jQuery(async () => {
             // We wait 800ms because colored-dialogues recolors on swipe with a 600ms
             // debounce, and we need the <font color> tags in place before parsing.
             eventSource.on(event_types.MESSAGE_SWIPED, (messageIndex) => {
+                const swipedMessage = chat[messageIndex];
+                if (swipedMessage && !swipedMessage.is_user && !swipedMessage.is_system) {
+                    queueExpressionCaptureForSpeaker(swipedMessage.name);
+                }
                 if (!extensionSettings.enabled) return;
                 if (!extensionSettings.chatBubbleMode || extensionSettings.chatBubbleMode === 'off') return;
 
