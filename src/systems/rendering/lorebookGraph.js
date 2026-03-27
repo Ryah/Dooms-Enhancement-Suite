@@ -444,12 +444,16 @@ function hideDetailPanel() {
 function initNetwork(container, data) {
     const options = {
         nodes: {
-            font: { face: 'Inter, sans-serif' },
+            font: { face: 'Inter, sans-serif', size: 11 },
+            scaling: {
+                label: { enabled: true, min: 8, max: 14 },
+            },
         },
         edges: {
             smooth: { type: 'continuous' },
             hoverWidth: 2,
             selectionWidth: 2,
+            font: { size: 0, strokeWidth: 0 }, // Hide edge labels by default
         },
         physics: {
             solver: 'barnesHut',
@@ -496,14 +500,50 @@ function initNetwork(container, data) {
         network.setOptions({ physics: { stabilization: { enabled: false } } });
     });
 
-    // Click node → show detail
+    // Zoom-based label visibility — hide node labels when zoomed out
+    let lastLabelState = true;
+    network.on('zoom', () => {
+        const scale = network.getScale();
+        const showLabels = scale > 0.4;
+        if (showLabels !== lastLabelState) {
+            lastLabelState = showLabels;
+            const allNodes = graphData.nodes.get();
+            const updates = allNodes.map(n => ({
+                id: n.id,
+                font: {
+                    ...n.font,
+                    color: showLabels ? (n._meta?.state === 'disabled' ? '#888' : '#e0e0e0') : 'transparent',
+                },
+            }));
+            graphData.nodes.update(updates);
+        }
+    });
+
+    // Click node → show detail + show connected edge labels
     network.on('click', (params) => {
+        // Reset all edge labels to hidden
+        const allEdges = graphData.edges.get();
+        graphData.edges.update(allEdges.map(e => ({
+            id: e.id,
+            font: { ...e.font, size: 0 },
+        })));
+
         if (params.nodes.length > 0) {
             const nodeId = params.nodes[0];
             const nodeData = graphData.nodes.get(nodeId);
             if (nodeData) {
                 selectedNodeId = nodeId;
                 renderDetailPanel(nodeData);
+
+                // Show edge labels for connected edges only
+                const connectedEdges = network.getConnectedEdges(nodeId);
+                graphData.edges.update(connectedEdges.map(eid => {
+                    const edge = graphData.edges.get(eid);
+                    return {
+                        id: eid,
+                        font: { ...edge.font, size: 9 },
+                    };
+                }));
             }
         } else {
             hideDetailPanel();
