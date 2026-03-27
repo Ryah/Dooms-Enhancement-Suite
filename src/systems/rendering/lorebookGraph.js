@@ -770,9 +770,6 @@ async function rebuildGraph() {
 
     if (loading) loading.style.display = 'flex';
 
-    // Reset isolate mode
-    isolatedNodeId = null;
-
     // Destroy existing network
     if (network) {
         network.destroy();
@@ -799,6 +796,12 @@ async function rebuildGraph() {
     }
 
     initNetwork(container, data);
+
+    // Apply persisted book visibility filters after network is built
+    const hasFilters = Object.values(bookVisibility).some(v => v === false);
+    if (hasFilters) {
+        setTimeout(() => applyBookFilter(), 100);
+    }
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
