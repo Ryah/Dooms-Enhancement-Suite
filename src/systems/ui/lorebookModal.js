@@ -4,7 +4,7 @@
  * Follows the same pattern as SettingsModal in modals.js.
  */
 import { extensionSettings } from '../../core/state.js';
-import { renderLorebook } from '../rendering/lorebook.js';
+import { renderLorebook, resetLorebookViewState } from '../rendering/lorebook.js';
 import { clearWICache } from '../lorebook/lorebookAPI.js';
 
 /**
@@ -45,6 +45,9 @@ export class LorebookModal {
 
         // Clear cached WI data so entries created outside the modal are picked up
         clearWICache();
+
+        // Reset transient view state (selected book/entry, expanded editor)
+        resetLorebookViewState();
 
         // Render lorebook content
         renderLorebook();
