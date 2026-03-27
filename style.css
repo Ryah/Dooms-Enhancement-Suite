@@ -18223,6 +18223,72 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     opacity: 0.6;
     flex-shrink: 0;
 }
+/* ── Legend ──────────────────────────────────────────────────────── */
+.rpg-lb-graph-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.rpg-lb-graph-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78em;
+    opacity: 0.8;
+}
+.rpg-lb-legend-shape {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+}
+.rpg-lb-legend-dot {
+    border-radius: 50%;
+    background: #4a7ba7;
+}
+.rpg-lb-legend-diamond {
+    background: #42a5f5;
+    transform: rotate(45deg);
+    width: 10px;
+    height: 10px;
+}
+.rpg-lb-legend-disabled {
+    background: #555 !important;
+    opacity: 0.5;
+}
+.rpg-lb-legend-vectorized {
+    border: 2px solid #ab47bc;
+    background: #4a7ba7;
+}
+.rpg-lb-legend-book {
+    border-radius: 50%;
+    background: #4a7ba7;
+    border: 2px solid #4a7ba7;
+    width: 14px;
+    height: 14px;
+}
+.rpg-lb-legend-line {
+    width: 20px;
+    height: 2px;
+    flex-shrink: 0;
+}
+.rpg-lb-legend-keyword {
+    background: rgba(74, 123, 167, 0.6);
+}
+.rpg-lb-legend-group {
+    background: rgba(171, 71, 188, 0.6);
+    background-image: repeating-linear-gradient(
+        90deg,
+        transparent, transparent 3px,
+        rgba(171, 71, 188, 0.6) 3px, rgba(171, 71, 188, 0.6) 6px
+    );
+    background-color: transparent;
+}
+.rpg-lb-graph-legend-sep {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 4px 0;
+}
+
 .rpg-lb-graph-books-toggle-all {
     font-size: 0.75em;
     padding: 2px 8px;

@@ -17,7 +17,7 @@ let visLoaded = false;
 let graphData = { nodes: null, edges: null };
 let selectedNodeId = null;
 let graphScope = 'all'; // 'all' | campaignId | worldName
-let graphFilters = { keywords: true, groups: true };
+let graphFilters = { keywords: true, groups: true, showEntries: false };
 let bookVisibility = {}; // { bookName: boolean } — per-book filter
 let isolatedNodeId = null; // When set, only show this node + neighbors
 let allEntriesCache = [];
@@ -93,9 +93,149 @@ function getCampaignBooks(campaignId) {
     return [];
 }
 
-// ─── Edge Computation ────────────────────────────────────────────────────────
+// ─── Graph Computation ───────────────────────────────────────────────────────
 
 function computeGraphData(worldDataMap) {
+    if (graphFilters.showEntries) {
+        return computeEntryGraph(worldDataMap);
+    }
+    return computeBookGraph(worldDataMap);
+}
+
+/**
+ * Book-level graph: one node per lorebook, edges for shared keywords between books
+ */
+function computeBookGraph(worldDataMap) {
+    const allBooks = Object.keys(worldDataMap);
+    const nodes = [];
+    const edges = [];
+    const activeNames = lorebookAPI.getActiveWorldNames();
+
+    // Build keyword-to-books index
+    const bookKeywords = {}; // bookName → Set of keywords
+    const bookEntryCount = {};
+    const bookTokens = {};
+
+    for (const [bookName, data] of Object.entries(worldDataMap)) {
+        if (!data?.entries) continue;
+        bookKeywords[bookName] = new Set();
+        const sorted = lorebookAPI.getEntriesSorted(data);
+        bookEntryCount[bookName] = sorted.length;
+        let totalTokens = 0;
+        for (const { entry } of sorted) {
+            totalTokens += Math.round((entry.content || '').length / 3.5);
+            for (const k of [...(entry.key || []), ...(entry.keysecondary || [])]) {
+                const normalized = k.trim().toLowerCase();
+                if (normalized) bookKeywords[bookName].add(normalized);
+            }
+        }
+        bookTokens[bookName] = totalTokens;
+    }
+
+    // Create book nodes
+    for (const bookName of allBooks) {
+        const isActive = activeNames.includes(bookName);
+        const bookColor = getBookColor(bookName, allBooks);
+        const entryCount = bookEntryCount[bookName] || 0;
+        const tokens = bookTokens[bookName] || 0;
+        const size = Math.max(20, Math.min(60, 20 + entryCount / 2));
+
+        nodes.push({
+            id: `book::${bookName}`,
+            label: bookName.length > 25 ? bookName.substring(0, 23) + '...' : bookName,
+            title: `${bookName}\n${entryCount} entries\n${tokens} tokens`,
+            size,
+            color: {
+                background: isActive ? bookColor : '#555',
+                border: bookColor,
+                highlight: { background: bookColor, border: '#fff' },
+            },
+            borderWidth: 2,
+            borderWidthSelected: 3,
+            font: { color: isActive ? '#e0e0e0' : '#888', size: 13 },
+            shape: 'dot',
+            opacity: isActive ? 1.0 : 0.5,
+            _meta: { bookName, uid: null, entry: null, state: isActive ? 'enabled' : 'disabled', tokenEst: tokens, fullTitle: bookName, isBook: true, entryCount },
+        });
+    }
+
+    // Compute edges between books based on shared keywords
+    const edgeSet = new Set();
+    if (graphFilters.keywords) {
+        for (let i = 0; i < allBooks.length; i++) {
+            for (let j = i + 1; j < allBooks.length; j++) {
+                const a = allBooks[i];
+                const b = allBooks[j];
+                const keysA = bookKeywords[a] || new Set();
+                const keysB = bookKeywords[b] || new Set();
+                const shared = [...keysA].filter(k => keysB.has(k));
+                if (shared.length > 0) {
+                    const edgeKey = [a, b].sort().join('|');
+                    if (!edgeSet.has(edgeKey)) {
+                        edgeSet.add(edgeKey);
+                        edges.push({
+                            from: `book::${a}`,
+                            to: `book::${b}`,
+                            label: `${shared.length} shared`,
+                            title: shared.slice(0, 10).join(', ') + (shared.length > 10 ? '...' : ''),
+                            color: { color: 'rgba(74, 123, 167, 0.4)', highlight: 'rgba(74, 123, 167, 0.8)' },
+                            font: { color: '#888', size: 0, strokeWidth: 0 },
+                            width: Math.min(8, 1 + shared.length / 5),
+                            _type: 'keyword',
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Inclusion group edges between books
+    if (graphFilters.groups) {
+        const bookGroups = {}; // bookName → Set of group names
+        for (const [bookName, data] of Object.entries(worldDataMap)) {
+            if (!data?.entries) continue;
+            bookGroups[bookName] = new Set();
+            const sorted = lorebookAPI.getEntriesSorted(data);
+            for (const { entry } of sorted) {
+                const g = (entry.group || '').trim();
+                if (g) bookGroups[bookName].add(g);
+            }
+        }
+        for (let i = 0; i < allBooks.length; i++) {
+            for (let j = i + 1; j < allBooks.length; j++) {
+                const a = allBooks[i];
+                const b = allBooks[j];
+                const groupsA = bookGroups[a] || new Set();
+                const groupsB = bookGroups[b] || new Set();
+                const shared = [...groupsA].filter(g => groupsB.has(g));
+                if (shared.length > 0) {
+                    const edgeKey = [a, b].sort().join('|group|');
+                    if (!edgeSet.has(edgeKey)) {
+                        edgeSet.add(edgeKey);
+                        edges.push({
+                            from: `book::${a}`,
+                            to: `book::${b}`,
+                            label: shared.join(', '),
+                            dashes: true,
+                            color: { color: 'rgba(171, 71, 188, 0.5)', highlight: 'rgba(171, 71, 188, 0.8)' },
+                            font: { color: '#ab47bc', size: 0, strokeWidth: 0 },
+                            width: Math.min(6, 1 + shared.length),
+                            _type: 'group',
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    allEntriesCache = allBooks.map(b => ({ id: `book::${b}`, bookName: b }));
+    return { nodes, edges };
+}
+
+/**
+ * Entry-level graph: one node per entry, edges for shared keywords/groups between entries
+ */
+function computeEntryGraph(worldDataMap) {
     const allBooks = Object.keys(worldDataMap);
     const entries = [];
     const nodes = [];
@@ -116,7 +256,6 @@ function computeGraphData(worldDataMap) {
             else if (entry.constant) state = 'constant';
             else if (entry.vectorized) state = 'vectorized';
 
-            // Node size based on content length
             const size = Math.max(12, Math.min(40, 12 + tokenEst / 50));
 
             nodes.push({
@@ -131,13 +270,9 @@ function computeGraphData(worldDataMap) {
                 },
                 borderWidth: state === 'constant' || state === 'vectorized' ? 3 : 1,
                 borderWidthSelected: 3,
-                font: {
-                    color: state === 'disabled' ? '#888' : '#e0e0e0',
-                    size: 11,
-                },
+                font: { color: state === 'disabled' ? '#888' : '#e0e0e0', size: 11 },
                 shape: state === 'constant' ? 'diamond' : 'dot',
                 opacity: state === 'disabled' ? 0.5 : 1.0,
-                // Store metadata for detail panel
                 _meta: { bookName, uid, entry, state, tokenEst, fullTitle: title },
             });
 
@@ -145,14 +280,10 @@ function computeGraphData(worldDataMap) {
         }
     }
 
-    // Keyword inverted index
+    // Keyword edges
     const keywordIndex = {};
     for (const item of entries) {
-        const keys = [
-            ...(item.entry.key || []),
-            ...(item.entry.keysecondary || []),
-        ];
-        for (const k of keys) {
+        for (const k of [...(item.entry.key || []), ...(item.entry.keysecondary || [])]) {
             const normalized = k.trim().toLowerCase();
             if (!normalized) continue;
             if (!keywordIndex[normalized]) keywordIndex[normalized] = [];
@@ -160,24 +291,20 @@ function computeGraphData(worldDataMap) {
         }
     }
 
-    // Keyword edges
     const edgeSet = new Set();
     if (graphFilters.keywords) {
         for (const [keyword, ids] of Object.entries(keywordIndex)) {
-            if (ids.length < 2 || ids.length > 20) continue; // Skip overly common keywords
+            if (ids.length < 2 || ids.length > 20) continue;
             for (let i = 0; i < ids.length; i++) {
                 for (let j = i + 1; j < ids.length; j++) {
                     const edgeKey = [ids[i], ids[j]].sort().join('|');
                     if (!edgeSet.has(edgeKey)) {
                         edgeSet.add(edgeKey);
                         edges.push({
-                            from: ids[i],
-                            to: ids[j],
-                            label: keyword,
+                            from: ids[i], to: ids[j], label: keyword,
                             color: { color: 'rgba(74, 123, 167, 0.3)', highlight: 'rgba(74, 123, 167, 0.8)' },
-                            font: { color: '#888', size: 9, strokeWidth: 0 },
-                            width: 1,
-                            _type: 'keyword',
+                            font: { color: '#888', size: 0, strokeWidth: 0 },
+                            width: 1, _type: 'keyword',
                         });
                     }
                 }
@@ -201,14 +328,10 @@ function computeGraphData(worldDataMap) {
                     if (!edgeSet.has(edgeKey)) {
                         edgeSet.add(edgeKey);
                         edges.push({
-                            from: ids[i],
-                            to: ids[j],
-                            label: group,
-                            dashes: true,
+                            from: ids[i], to: ids[j], label: group, dashes: true,
                             color: { color: 'rgba(171, 71, 188, 0.4)', highlight: 'rgba(171, 71, 188, 0.8)' },
-                            font: { color: '#ab47bc', size: 9, strokeWidth: 0 },
-                            width: 2,
-                            _type: 'group',
+                            font: { color: '#ab47bc', size: 0, strokeWidth: 0 },
+                            width: 2, _type: 'group',
                         });
                     }
                 }
@@ -247,9 +370,27 @@ function buildGraphHTML() {
 
     // Filters
     html += '<div class="rpg-lb-graph-section">';
-    html += '<label class="rpg-lb-graph-label">Connections</label>';
+    html += '<label class="rpg-lb-graph-label">Display</label>';
+    html += `<label class="rpg-lb-graph-checkbox"><input type="checkbox" data-filter="showEntries" ${graphFilters.showEntries ? 'checked' : ''}> Show Entries</label>`;
     html += `<label class="rpg-lb-graph-checkbox"><input type="checkbox" data-filter="keywords" ${graphFilters.keywords ? 'checked' : ''}> Shared Keywords</label>`;
     html += `<label class="rpg-lb-graph-checkbox"><input type="checkbox" data-filter="groups" ${graphFilters.groups ? 'checked' : ''}> Inclusion Groups</label>`;
+    html += '</div>';
+
+    // Legend
+    html += '<div class="rpg-lb-graph-section">';
+    html += '<label class="rpg-lb-graph-label">Legend</label>';
+    html += '<div class="rpg-lb-graph-legend">';
+    // Node types
+    html += '<div class="rpg-lb-graph-legend-item"><span class="rpg-lb-legend-shape rpg-lb-legend-dot"></span> Enabled Entry</div>';
+    html += '<div class="rpg-lb-graph-legend-item"><span class="rpg-lb-legend-shape rpg-lb-legend-diamond"></span> Constant Entry</div>';
+    html += '<div class="rpg-lb-graph-legend-item"><span class="rpg-lb-legend-shape rpg-lb-legend-dot rpg-lb-legend-disabled"></span> Disabled Entry</div>';
+    html += '<div class="rpg-lb-graph-legend-item"><span class="rpg-lb-legend-shape rpg-lb-legend-dot rpg-lb-legend-vectorized"></span> Vectorized Entry</div>';
+    html += '<div class="rpg-lb-graph-legend-item"><span class="rpg-lb-legend-shape rpg-lb-legend-book"></span> Lorebook (grouped)</div>';
+    // Edge types
+    html += '<div class="rpg-lb-graph-legend-sep"></div>';
+    html += '<div class="rpg-lb-graph-legend-item"><span class="rpg-lb-legend-line rpg-lb-legend-keyword"></span> Shared Keyword</div>';
+    html += '<div class="rpg-lb-graph-legend-item"><span class="rpg-lb-legend-line rpg-lb-legend-group"></span> Inclusion Group</div>';
+    html += '</div>';
     html += '</div>';
 
     // Library (campaign) list with visibility toggles
@@ -352,6 +493,29 @@ function renderDetailPanel(nodeData) {
     if (!panel) return;
 
     const meta = nodeData._meta;
+
+    // Book-level node detail
+    if (meta.isBook) {
+        let html = '<div class="rpg-lb-graph-detail-inner">';
+        html += `<div class="rpg-lb-graph-detail-header">`;
+        html += `<span class="rpg-lb-graph-detail-state rpg-lb-graph-detail-state--${meta.state}"></span>`;
+        html += `<h4>${meta.fullTitle}</h4>`;
+        html += `<button class="rpg-lb-graph-detail-close"><i class="fa-solid fa-xmark"></i></button>`;
+        html += '</div>';
+        html += '<div class="rpg-lb-graph-detail-badges">';
+        html += `<span class="rpg-lb-graph-badge">${meta.entryCount} entries</span>`;
+        html += `<span class="rpg-lb-graph-badge">${meta.tokenEst}t total</span>`;
+        html += '</div>';
+        html += `<button class="rpg-lb-graph-open-editor" data-world="${meta.bookName}" data-uid="">`;
+        html += '<i class="fa-solid fa-pen-to-square"></i> Open in Editor';
+        html += '</button>';
+        html += '</div>';
+        panel.querySelector('.rpg-lb-graph-detail-content').innerHTML = html;
+        panel.classList.add('visible');
+        return;
+    }
+
+    // Entry-level node detail
     const entry = meta.entry;
     const contentPreview = (entry.content || '').substring(0, 300);
     const keywords = [...(entry.key || [])];
