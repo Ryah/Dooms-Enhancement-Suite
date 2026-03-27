@@ -200,28 +200,22 @@ export async function saveEntriesToBook(worldName, entries) {
 
     let saved = 0;
     for (const entry of entries) {
-        // Create a new entry slot
-        const updatedData = lorebookAPI.createEntry(worldName, data);
+        // createEntry returns the new entry object (not the full data)
+        const newEntry = lorebookAPI.createEntry(worldName, data);
+        if (!newEntry) continue;
 
-        // Find the newly created entry (highest UID)
-        const uids = Object.keys(updatedData.entries).map(Number);
-        const newUid = Math.max(...uids);
-        const newEntry = updatedData.entries[newUid];
-
-        if (newEntry) {
-            // Populate with our generated data
-            newEntry.comment = entry.comment || '';
-            newEntry.key = entry.key || [];
-            newEntry.keysecondary = entry.keysecondary || [];
-            newEntry.content = entry.content || '';
-            newEntry.position = entry.position ?? 0;
-            newEntry.depth = entry.depth ?? 4;
-            newEntry.group = entry.group || '';
-            newEntry.order = entry.order ?? 100;
-            newEntry.disable = false;
-            newEntry.constant = false;
-            saved++;
-        }
+        // Populate with our generated data
+        newEntry.comment = entry.comment || '';
+        newEntry.key = entry.key || [];
+        newEntry.keysecondary = entry.keysecondary || [];
+        newEntry.content = entry.content || '';
+        newEntry.position = entry.position ?? 0;
+        newEntry.depth = entry.depth ?? 4;
+        newEntry.group = entry.group || '';
+        newEntry.order = entry.order ?? 100;
+        newEntry.disable = false;
+        newEntry.constant = false;
+        saved++;
     }
 
     await lorebookAPI.saveWorldData(worldName, data);
