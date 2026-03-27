@@ -6,8 +6,7 @@
  */
 import * as worldForge from '../generation/worldForge.js';
 import * as lorebookAPI from '../lorebook/lorebookAPI.js';
-import * as campaignManager from '../lorebook/campaignManager.js';
-import { toastr } from '../../../../../../../lib/toastr.min.js';
+/* global toastr */ // toastr is a jQuery plugin loaded globally by SillyTavern
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
