@@ -16,6 +16,7 @@ import * as lorebookAPI from '../lorebook/lorebookAPI.js';
 import * as campaignManager from '../lorebook/campaignManager.js';
 import { getLorebookModal } from '../ui/lorebookModal.js';
 import { renderGraphView, destroyGraphView } from './lorebookGraph.js';
+import { renderWorldForge, clearWorldForge } from '../ui/worldForgeModal.js';
 
 // ─── Icon Palette ────────────────────────────────────────────────────────────
 
@@ -807,7 +808,33 @@ export function initLorebookEventDelegation() {
         const view = $(this).data('view');
         if (extensionSettings.lorebook) extensionSettings.lorebook.viewMode = view;
         saveSettings();
+        // Hide forge if open
+        const forgeContainer = document.getElementById('rpg-wf-container');
+        if (forgeContainer) forgeContainer.style.display = 'none';
+        const body = $modal.find('.rpg-lb-modal-body')[0];
+        if (body) body.style.display = '';
         renderLorebook();
+    });
+
+    // ── World Forge toggle ──────────────────────────────────────────────────
+    $modal.on('click', '.rpg-wf-open-btn', function () {
+        const forgeContainer = document.getElementById('rpg-wf-container');
+        const body = $modal.find('.rpg-lb-modal-body')[0];
+        if (!forgeContainer) return;
+
+        const isVisible = forgeContainer.style.display !== 'none';
+        if (isVisible) {
+            // Close forge, show lore library
+            forgeContainer.style.display = 'none';
+            if (body) body.style.display = '';
+            $(this).removeClass('active');
+        } else {
+            // Open forge, hide lore library
+            forgeContainer.style.display = 'flex';
+            if (body) body.style.display = 'none';
+            $(this).addClass('active');
+            renderWorldForge(forgeContainer);
+        }
     });
 
     // ── Book selection (left panel) ──────────────────────────────────────────

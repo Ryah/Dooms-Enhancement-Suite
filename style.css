@@ -18416,5 +18416,441 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     .rpg-lb-view-btn[data-view="graph"] {
         display: none !important;
     }
+    .rpg-wf-open-btn {
+        display: none !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WORLD FORGE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Forge Button in Header ─────────────────────────────────────────── */
+.rpg-wf-open-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 165, 0, 0.4);
+    background: rgba(255, 165, 0, 0.1);
+    color: #ffa500;
+    cursor: pointer;
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+    margin-left: 8px;
+}
+.rpg-wf-open-btn:hover {
+    background: rgba(255, 165, 0, 0.2);
+}
+
+/* ── Container ──────────────────────────────────────────────────────── */
+.rpg-wf-container {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    background: var(--rpg-bg, #1a1a2e);
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────── */
+.rpg-wf-layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── Conversation Panel ─────────────────────────────────────────────── */
+.rpg-wf-conversation {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+.rpg-wf-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.rpg-wf-welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    opacity: 0.4;
+    text-align: center;
+    gap: 8px;
+}
+.rpg-wf-welcome i {
+    font-size: 2.5em;
+    color: #ffa500;
+}
+.rpg-wf-welcome h3 {
+    margin: 0;
+    font-size: 1.2em;
+}
+.rpg-wf-welcome p {
+    margin: 0;
+    font-size: 0.85em;
+    max-width: 300px;
+}
+
+/* ── Messages ───────────────────────────────────────────────────────── */
+.rpg-wf-message {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+.rpg-wf-msg-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.85em;
+}
+.rpg-wf-message--user .rpg-wf-msg-icon {
+    background: rgba(74, 123, 167, 0.2);
+    color: #4a7ba7;
+}
+.rpg-wf-message--assistant .rpg-wf-msg-icon {
+    background: rgba(255, 165, 0, 0.2);
+    color: #ffa500;
+}
+.rpg-wf-msg-text {
+    flex: 1;
+    font-size: 0.9em;
+    line-height: 1.5;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+}
+.rpg-wf-message--user .rpg-wf-msg-text {
+    background: rgba(74, 123, 167, 0.1);
+}
+
+/* ── Entries Preview Panel ──────────────────────────────────────────── */
+.rpg-wf-entries-panel {
+    width: 380px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.rpg-wf-entries-header {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.rpg-wf-entries-header h4 {
+    margin: 0;
+    font-size: 0.95em;
+}
+.rpg-wf-entry-count {
+    font-size: 0.78em;
+    opacity: 0.6;
+}
+.rpg-wf-entries-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.rpg-wf-entries-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    opacity: 0.3;
+    gap: 8px;
+    text-align: center;
+}
+.rpg-wf-entries-empty i {
+    font-size: 2em;
+}
+.rpg-wf-entries-actions {
+    padding: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.rpg-wf-accept-all {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(102, 187, 106, 0.4);
+    background: rgba(102, 187, 106, 0.1);
+    color: #66bb6a;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background 0.15s;
+}
+.rpg-wf-accept-all:hover:not(:disabled) {
+    background: rgba(102, 187, 106, 0.2);
+}
+.rpg-wf-accept-all:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/* ── Entry Cards ────────────────────────────────────────────────────── */
+.rpg-wf-entry-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+.rpg-wf-entry-card.accepted {
+    border-color: rgba(102, 187, 106, 0.3);
+    background: rgba(102, 187, 106, 0.05);
+}
+.rpg-wf-entry-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.rpg-wf-entry-title {
+    font-weight: 600;
+    font-size: 0.9em;
+}
+.rpg-wf-entry-tokens {
+    font-size: 0.75em;
+    opacity: 0.5;
+}
+.rpg-wf-entry-keywords {
+    font-size: 0.78em;
+    opacity: 0.6;
+    margin-bottom: 6px;
+}
+.rpg-wf-entry-keywords i {
+    margin-right: 4px;
+    opacity: 0.5;
+}
+.rpg-wf-entry-preview {
+    font-size: 0.82em;
+    line-height: 1.4;
+    opacity: 0.7;
+    max-height: 80px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.rpg-wf-entry-card-actions {
+    display: flex;
+    gap: 6px;
+}
+.rpg-wf-entry-accept {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(102, 187, 106, 0.4);
+    background: rgba(102, 187, 106, 0.1);
+    color: #66bb6a;
+    cursor: pointer;
+    font-size: 0.78em;
+}
+.rpg-wf-entry-accept:hover { background: rgba(102, 187, 106, 0.2); }
+.rpg-wf-entry-edit {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(74, 123, 167, 0.4);
+    background: rgba(74, 123, 167, 0.1);
+    color: #4a7ba7;
+    cursor: pointer;
+    font-size: 0.78em;
+}
+.rpg-wf-entry-edit:hover { background: rgba(74, 123, 167, 0.2); }
+.rpg-wf-entry-discard {
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(233, 69, 96, 0.3);
+    background: transparent;
+    color: #e94560;
+    cursor: pointer;
+    font-size: 0.78em;
+    margin-left: auto;
+}
+.rpg-wf-entry-discard:hover { background: rgba(233, 69, 96, 0.1); }
+.rpg-wf-entry-saved {
+    color: #66bb6a;
+    font-size: 0.78em;
+    opacity: 0.7;
+}
+
+/* ── Controls Bar ───────────────────────────────────────────────────── */
+.rpg-wf-controls {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.rpg-wf-controls-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.rpg-wf-target, .rpg-wf-mode {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--rpg-text, #e0e0e0);
+    font-size: 0.82em;
+}
+.rpg-wf-target {
+    flex: 1;
+    min-width: 150px;
+}
+.rpg-wf-context-toggle {
+    font-size: 0.82em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    opacity: 0.7;
+}
+.rpg-wf-context-toggle:hover { opacity: 1; }
+.rpg-wf-input-row {
+    display: flex;
+    gap: 8px;
+}
+.rpg-wf-input {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--rpg-text, #e0e0e0);
+    font-size: 0.9em;
+    resize: none;
+    font-family: inherit;
+}
+.rpg-wf-input:focus {
+    outline: none;
+    border-color: rgba(255, 165, 0, 0.4);
+}
+.rpg-wf-generate-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 165, 0, 0.4);
+    background: rgba(255, 165, 0, 0.15);
+    color: #ffa500;
+    cursor: pointer;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+.rpg-wf-generate-btn:hover:not(:disabled) {
+    background: rgba(255, 165, 0, 0.25);
+}
+.rpg-wf-generate-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/* ── Edit Overlay ───────────────────────────────────────────────────── */
+.rpg-wf-edit-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10100;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.rpg-wf-edit-modal {
+    background: var(--rpg-bg, #1a1a2e);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    width: 500px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.rpg-wf-edit-modal h4 {
+    margin: 0 0 8px 0;
+}
+.rpg-wf-edit-modal label {
+    font-size: 0.78em;
+    opacity: 0.6;
+    margin-top: 4px;
+}
+.rpg-wf-edit-field {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--rpg-text, #e0e0e0);
+    font-size: 0.85em;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.rpg-wf-edit-content {
+    min-height: 150px;
+    resize: vertical;
+}
+.rpg-wf-edit-row {
+    display: flex;
+    gap: 10px;
+}
+.rpg-wf-edit-row > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.rpg-wf-edit-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+.rpg-wf-edit-save {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(102, 187, 106, 0.4);
+    background: rgba(102, 187, 106, 0.15);
+    color: #66bb6a;
+    cursor: pointer;
+}
+.rpg-wf-edit-cancel {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    color: var(--rpg-text, #e0e0e0);
+    cursor: pointer;
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────────────── */
+.rpg-wf-messages::-webkit-scrollbar,
+.rpg-wf-entries-list::-webkit-scrollbar {
+    width: 5px;
+}
+.rpg-wf-messages::-webkit-scrollbar-thumb,
+.rpg-wf-entries-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 165, 0, 0.2);
+    border-radius: 3px;
 }
 
