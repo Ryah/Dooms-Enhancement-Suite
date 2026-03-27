@@ -376,6 +376,20 @@ function buildGraphHTML() {
     html += `<label class="rpg-lb-graph-checkbox"><input type="checkbox" data-filter="groups" ${graphFilters.groups ? 'checked' : ''}> Inclusion Groups</label>`;
     html += '</div>';
 
+    // Layout controls
+    html += '<div class="rpg-lb-graph-section">';
+    html += '<label class="rpg-lb-graph-label">Layout</label>';
+    html += '<div class="rpg-lb-graph-slider-row">';
+    html += '<span class="rpg-lb-graph-slider-label">Spacing</span>';
+    html += '<input type="range" class="rpg-lb-graph-slider" data-param="spacing" min="30" max="400" value="120" step="10">';
+    html += '</div>';
+    html += '<div class="rpg-lb-graph-slider-row">';
+    html += '<span class="rpg-lb-graph-slider-label">Repulsion</span>';
+    html += '<input type="range" class="rpg-lb-graph-slider" data-param="repulsion" min="-10000" max="-500" value="-3000" step="100">';
+    html += '</div>';
+    html += '<button class="rpg-lb-graph-relayout-btn"><i class="fa-solid fa-arrows-rotate"></i> Re-layout</button>';
+    html += '</div>';
+
     // Legend
     html += '<div class="rpg-lb-graph-section">';
     html += '<label class="rpg-lb-graph-label">Legend</label>';
@@ -784,6 +798,27 @@ function setupGraphEvents() {
             graphFilters[e.target.dataset.filter] = e.target.checked;
             await rebuildGraph();
         });
+    });
+
+    // Layout sliders — update physics in real-time
+    modal.querySelectorAll('.rpg-lb-graph-slider').forEach(slider => {
+        slider.addEventListener('input', () => {
+            if (!network) return;
+            const param = slider.dataset.param;
+            const val = Number(slider.value);
+            if (param === 'spacing') {
+                network.setOptions({ physics: { barnesHut: { springLength: val } } });
+            } else if (param === 'repulsion') {
+                network.setOptions({ physics: { barnesHut: { gravitationalConstant: val } } });
+            }
+        });
+    });
+
+    // Re-layout button — restart physics stabilization
+    modal.querySelector('.rpg-lb-graph-relayout-btn')?.addEventListener('click', () => {
+        if (!network) return;
+        network.setOptions({ physics: { stabilization: { enabled: true, iterations: 200 } } });
+        network.stabilize(200);
     });
 
     // Zoom controls

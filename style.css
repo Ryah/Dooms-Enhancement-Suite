@@ -18283,6 +18283,56 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     );
     background-color: transparent;
 }
+/* ── Layout Sliders ──────────────────────────────────────────────── */
+.rpg-lb-graph-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.rpg-lb-graph-slider-label {
+    font-size: 0.78em;
+    opacity: 0.7;
+    min-width: 60px;
+}
+.rpg-lb-graph-slider {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(74, 123, 167, 0.3);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+.rpg-lb-graph-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--rpg-highlight, #4a7ba7);
+    cursor: pointer;
+}
+.rpg-lb-graph-relayout-btn {
+    width: 100%;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(74, 123, 167, 0.3);
+    background: transparent;
+    color: var(--rpg-text, #e0e0e0);
+    cursor: pointer;
+    font-size: 0.8em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 4px;
+    transition: background 0.15s;
+}
+.rpg-lb-graph-relayout-btn:hover {
+    background: rgba(74, 123, 167, 0.15);
+}
+
 .rpg-lb-graph-legend-sep {
     height: 1px;
     background: rgba(255, 255, 255, 0.1);
