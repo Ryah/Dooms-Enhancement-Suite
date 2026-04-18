@@ -1,94 +1,69 @@
-# Character Workshop — layout mockups
+# Character Workshop — chosen mockup
 
-Three static HTML mockups for a proposed **Character Workshop** screen in
-Doom's Enhancement Suite: a single modal that unifies everything a user can
-currently do to a character across three different UIs (portrait-bar
-right-click menu, Tracker Editor popup, Bunny Mo character sheet).
+Static HTML mockup of the **Character Workshop** screen for Doom's
+Enhancement Suite: a single modal that unifies what today is split across
+the portrait-bar right-click menu, the Tracker Editor popup, and the Bunny
+Mo character-sheet modal.
 
-These files are **not** wired into the extension. They live under `mockups/`
-so the shipped extension ignores them. Open each HTML file directly in a
-browser to evaluate the layout.
+Three layout variants were prototyped (tabbed / split / wizard). The
+split-pane layout with a live portrait preview was selected and is the
+only one kept here; the others were pruned to keep the branch clean.
 
 ```
-open mockups/character-workshop/variant-a-tabbed.html
-open mockups/character-workshop/variant-b-split.html
-open mockups/character-workshop/variant-c-wizard.html
+mockups/character-workshop/
+    workshop-mockup.html   # the chosen layout (formerly variant-b-split.html)
+    shared.css             # DES theme tokens + modal/form primitives
 ```
 
-Or from the repo root:
+## How to view
+
+`workshop-mockup.html` depends on `shared.css`, so open it via any local
+web server (or just open the file directly — most browsers will still
+load the sibling stylesheet from `file://`). From the repo root:
 
 ```
 python3 -m http.server 8000
-# then visit http://localhost:8000/mockups/character-workshop/
+# then visit http://localhost:8000/mockups/character-workshop/workshop-mockup.html
 ```
 
-## The three variants
+## Layout summary
 
-All three cover the same data: name, relationship, portrait, dialogue color,
-tracker fields (custom fields, thoughts, character stats), and Bunny Mo
-character-sheet sections. They only differ in how that data is laid out.
+Split pane inside the standard `.rpg-settings-popup` modal shell.
 
-### Variant A — Tabbed single-pane (`variant-a-tabbed.html`)
-Mirrors today's Tracker Editor popup (`#rpg-tracker-editor-popup`). Horizontal
-tab bar: **Identity · Appearance · Trackers · Sheet**, one pane at a time,
-compact ~560px modal.
-- **Pros:** zero learning curve for existing DES users; same shell as other
-  modals; smallest footprint so it fits on narrow windows.
-- **Cons:** you can't see the portrait preview while editing trackers or
-  sheet sections; every field change is invisible until you flip back to the
-  Appearance tab.
-
-### Variant B — Split pane with live preview (`variant-b-split.html`) — recommended
-Left rail (~35%) shows a live `.dooms-portrait-card` preview and a vertical
-section nav. Right pane (~65%) holds the current section's editor. Uploading
-a portrait or picking a swatch updates the preview card immediately.
-- **Pros:** WYSIWYG — every change is visible; the preview validates the
-  real portrait-card style in context; rail also doubles as quick-glance
-  summary.
-- **Cons:** wider modal (up to 900px) so it's less friendly on narrow
-  screens; the right pane has slightly less horizontal room for the Sheet
-  editor than Variant A.
-
-### Variant C — Stepped wizard (`variant-c-wizard.html`)
-Five-step flow: **1 Identity → 2 Appearance → 3 Trackers → 4 Sheet → 5
-Review**. Back/Next in footer, with a live Review step summarizing all
-choices plus a portrait preview.
-- **Pros:** guided — great for creating a character from scratch; enforces
-  completeness; Review step catches mistakes before save.
-- **Cons:** tedious for quick edits ("I just want to change her dialogue
-  color"); requires users to click through unrelated steps; doesn't match
-  any existing DES flow.
-
-## Recommendation
-
-**Go with Variant B.** The live preview is the highest-value improvement
-over the current fragmented UX, and the section nav still lets power users
-jump straight to what they want (unlike the wizard's forced order). Variant
-A is a fine fallback if we want to minimize scope / match existing modals
-exactly.
+- **Left rail (~35%)** — live `.dooms-portrait-card` preview that reflects
+  the name, dialogue color, relationship emoji, and uploaded portrait in
+  real time. Below it, a vertical section nav: **Identity · Appearance ·
+  Trackers · Sheet**.
+- **Right pane (~65%)** — form for the currently selected section,
+  scrollable.
+- **Footer** — `Delete character` (left), `Cancel` / `Save` (right).
 
 ## Visual contract
 
-All three mockups share `shared.css`, which declares the DES theme tokens
-from `style.css:90-95` on `:root` and re-implements the modal/tab/form
-primitives from `.rpg-settings-popup*` (`style.css:5817-5950`) and
-`.dooms-portrait-card` (`style.css:13933-13972`). The 30-color dialogue
-palette is copied verbatim from `src/systems/ui/portraitBar.js:29-38`.
-Relationship emoji and default tracker fields come from
-`src/systems/ui/trackerEditor.js:289-357`.
+- DES theme tokens from `style.css:90-95` (`--rpg-bg`, `--rpg-accent`,
+  `--rpg-text`, `--rpg-highlight`, `--rpg-border`, `--rpg-shadow`).
+- Modal shell selectors from `style.css:5817-5950`
+  (`.rpg-settings-popup-content / -header / -body / -footer`).
+- Portrait card from `style.css:13933-13972`.
+- 30-color dialogue palette copied verbatim from
+  `src/systems/ui/portraitBar.js:29-38`.
+- Default relationship emoji and tracker field labels copied from
+  `src/systems/ui/trackerEditor.js:289-357`.
 
 ## What's mocked vs. not
 
-Cosmetic interactions work: tab/step switching, accordion toggles, swatch
-selection highlight, relationship chip selection, portrait upload preview
-(via `URL.createObjectURL`), live name/color propagation to the preview
-card. Nothing persists, nothing calls SillyTavern, and the Save/Delete
-buttons are no-ops.
+Cosmetic interactions work: section nav, accordion toggles, swatch
+selection, relationship chips, portrait upload preview (via
+`URL.createObjectURL`), live name/color propagation to the preview card.
+Nothing persists, nothing calls SillyTavern, and Save/Delete are no-ops.
 
 ## Known limitations
 
 - Only the Default theme is rendered. The other 10 DES theme presets
-  (Cyberpunk, Fantasy, etc.) should be validated as a follow-up.
-- Mobile layout is minimally considered — it doesn't break at 600px wide
-  but isn't polished below that.
+  (Cyberpunk, Fantasy, etc.) should be validated once this is wired up
+  for real.
 - No keyboard navigation beyond native tab order.
+- The Trackers tab currently shows the global tracker field definitions
+  (Appearance, Demeanor, Thoughts, stats) — during implementation we'll
+  decide whether the Workshop edits per-character values here, global
+  field defs, or both.
