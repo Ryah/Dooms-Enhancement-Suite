@@ -19847,3 +19847,81 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     background: rgba(10, 22, 40, 0.95);
     color: #b8d8e8;
 }
+
+/* ============================================================================
+   Footer buttons for Character Workshop + Roster modals.
+   Scoped overrides that (a) undo the width:100% default from
+   .rpg-btn-primary at style.css:3555 so Save doesn't swallow the footer,
+   (b) define .rpg-btn-ghost and .rpg-btn-danger variants DES doesn't have
+   elsewhere so they theme correctly on every preset.
+   ============================================================================ */
+
+#character-workshop-popup .rpg-settings-popup-footer .rpg-btn,
+#character-roster-popup .rpg-settings-popup-footer .rpg-btn {
+    width: auto;
+    padding: 0.5rem 1rem;
+    font-size: var(--modal-font-small, 0.8rem);
+    font-weight: 600;
+    border-radius: 0.375rem;
+    border: 1px solid var(--rpg-border);
+    background: transparent;
+    color: var(--rpg-text);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s, box-shadow 0.2s;
+}
+#character-workshop-popup .rpg-settings-popup-footer .rpg-btn:hover,
+#character-roster-popup .rpg-settings-popup-footer .rpg-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--rpg-highlight);
+}
+#character-workshop-popup .rpg-settings-popup-footer .rpg-btn:active,
+#character-roster-popup .rpg-settings-popup-footer .rpg-btn:active {
+    transform: translateY(1px);
+}
+
+/* Primary (Save) — solid, uses the theme's highlight color */
+#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-primary,
+#character-roster-popup .rpg-settings-popup-footer .rpg-btn-primary {
+    background: var(--rpg-highlight);
+    color: var(--rpg-bg);
+    border-color: var(--rpg-highlight);
+}
+#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-primary:hover,
+#character-roster-popup .rpg-settings-popup-footer .rpg-btn-primary:hover {
+    background: var(--rpg-highlight);
+    color: var(--rpg-bg);
+    box-shadow: 0 0 10px var(--rpg-highlight);
+    opacity: 0.92;
+}
+
+/* Ghost (Cancel) — outlined, uses body text so it's always legible */
+#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-ghost,
+#character-roster-popup .rpg-settings-popup-footer .rpg-btn-ghost {
+    background: transparent;
+    color: var(--rpg-text);
+    border-color: var(--rpg-border);
+    opacity: 0.85;
+}
+#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-ghost:hover,
+#character-roster-popup .rpg-settings-popup-footer .rpg-btn-ghost:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--rpg-text);
+    border-color: var(--rpg-text);
+}
+
+/* Danger (Delete) — outlined in a bright-red accent that still reads on
+   every DES theme. Uses a fixed red rather than --rpg-highlight so it's
+   distinguishable from the primary action color. */
+#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-danger,
+#character-roster-popup .rpg-settings-popup-footer .rpg-btn-danger {
+    background: transparent;
+    color: #ff8a8a;
+    border-color: rgba(214, 48, 49, 0.7);
+}
+#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-danger:hover,
+#character-roster-popup .rpg-settings-popup-footer .rpg-btn-danger:hover {
+    background: rgba(214, 48, 49, 0.15);
+    color: #ffb4b4;
+    border-color: #ff5555;
+}
