@@ -19856,72 +19856,92 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
    elsewhere so they theme correctly on every preset.
    ============================================================================ */
 
-#character-workshop-popup .rpg-settings-popup-footer .rpg-btn,
-#character-roster-popup .rpg-settings-popup-footer .rpg-btn {
+/* Base .rpg-btn — applies to every button inside either modal, including
+   the Appearance tab's Upload/Remove portrait pair (one is a <label>),
+   the Trackers tab's 'Open Tracker Editor', and the footer row. */
+#character-workshop-popup .rpg-btn,
+#character-roster-popup .rpg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
     width: auto;
+    min-height: 2rem;
     padding: 0.5rem 1rem;
+    font: inherit;
     font-size: var(--modal-font-small, 0.8rem);
     font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
     border-radius: 0.375rem;
     border: 1px solid var(--rpg-border);
     background: transparent;
     color: var(--rpg-text);
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s, box-shadow 0.2s;
+    transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s, box-shadow 0.2s, opacity 0.2s;
 }
-#character-workshop-popup .rpg-settings-popup-footer .rpg-btn:hover,
-#character-roster-popup .rpg-settings-popup-footer .rpg-btn:hover {
+#character-workshop-popup .rpg-btn:hover,
+#character-roster-popup .rpg-btn:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: var(--rpg-highlight);
+    color: var(--rpg-text);
 }
-#character-workshop-popup .rpg-settings-popup-footer .rpg-btn:active,
-#character-roster-popup .rpg-settings-popup-footer .rpg-btn:active {
+#character-workshop-popup .rpg-btn:active,
+#character-roster-popup .rpg-btn:active {
     transform: translateY(1px);
 }
 
 /* Primary (Save) — solid, uses the theme's highlight color */
-#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-primary,
-#character-roster-popup .rpg-settings-popup-footer .rpg-btn-primary {
+#character-workshop-popup .rpg-btn-primary,
+#character-roster-popup .rpg-btn-primary {
     background: var(--rpg-highlight);
     color: var(--rpg-bg);
     border-color: var(--rpg-highlight);
+    width: auto;
 }
-#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-primary:hover,
-#character-roster-popup .rpg-settings-popup-footer .rpg-btn-primary:hover {
+#character-workshop-popup .rpg-btn-primary:hover,
+#character-roster-popup .rpg-btn-primary:hover {
     background: var(--rpg-highlight);
     color: var(--rpg-bg);
     box-shadow: 0 0 10px var(--rpg-highlight);
     opacity: 0.92;
 }
 
-/* Ghost (Cancel) — outlined, uses body text so it's always legible */
-#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-ghost,
-#character-roster-popup .rpg-settings-popup-footer .rpg-btn-ghost {
+/* Ghost (Cancel, Remove portrait) — outlined, uses body text so it's
+   always legible on every theme. */
+#character-workshop-popup .rpg-btn-ghost,
+#character-roster-popup .rpg-btn-ghost {
     background: transparent;
     color: var(--rpg-text);
     border-color: var(--rpg-border);
     opacity: 0.85;
 }
-#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-ghost:hover,
-#character-roster-popup .rpg-settings-popup-footer .rpg-btn-ghost:hover {
+#character-workshop-popup .rpg-btn-ghost:hover,
+#character-roster-popup .rpg-btn-ghost:hover {
     opacity: 1;
     background: rgba(255, 255, 255, 0.06);
     color: var(--rpg-text);
     border-color: var(--rpg-text);
 }
 
-/* Danger (Delete) — outlined in a bright-red accent that still reads on
-   every DES theme. Uses a fixed red rather than --rpg-highlight so it's
-   distinguishable from the primary action color. */
-#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-danger,
-#character-roster-popup .rpg-settings-popup-footer .rpg-btn-danger {
+/* Danger (Delete character) — outlined in a fixed warm red so it's
+   readable on every DES theme and cannot be confused with the primary
+   highlight color. */
+#character-workshop-popup .rpg-btn-danger,
+#character-roster-popup .rpg-btn-danger {
     background: transparent;
     color: #ff8a8a;
     border-color: rgba(214, 48, 49, 0.7);
 }
-#character-workshop-popup .rpg-settings-popup-footer .rpg-btn-danger:hover,
-#character-roster-popup .rpg-settings-popup-footer .rpg-btn-danger:hover {
+#character-workshop-popup .rpg-btn-danger:hover,
+#character-roster-popup .rpg-btn-danger:hover {
     background: rgba(214, 48, 49, 0.15);
     color: #ffb4b4;
     border-color: #ff5555;
+}
+
+/* Upload portrait is a <label> — give it the same interactive affordance
+   as real buttons. */
+#character-workshop-popup label.rpg-btn {
+    user-select: none;
 }
