@@ -463,6 +463,24 @@ export function getSyncedExpressionPortrait(characterName) {
 export function clearSyncedExpressionPortraits() {
     syncedExpressionPortraits = {};
 }
+
+/**
+ * Session-only storage for the current expression LABEL per character
+ * (e.g. "happy", "angry"). Populated alongside syncedExpressionPortraits
+ * so UI can surface the label in tooltips without re-classifying.
+ */
+export let syncedExpressionLabels = {};
+export function setSyncedExpressionLabel(characterName, label) {
+    if (!characterName || !label) return;
+    syncedExpressionLabels[characterName] = label;
+}
+export function getSyncedExpressionLabel(characterName) {
+    return syncedExpressionLabels[characterName] || null;
+}
+export function clearSyncedExpressionLabels() {
+    syncedExpressionLabels = {};
+}
+
 /**
  * Tracks whether the last action was a swipe (for separate mode)
  * Used to determine whether to commit lastGeneratedData to committedTrackerData

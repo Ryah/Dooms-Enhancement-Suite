@@ -12,7 +12,7 @@
  * Right-clicking a portrait card opens a context menu with "Upload Portrait"
  * and "Remove Portrait" options.
  */
-import { extensionSettings, lastGeneratedData, committedTrackerData, FALLBACK_AVATAR_DATA_URI } from '../../core/state.js';
+import { extensionSettings, lastGeneratedData, committedTrackerData, FALLBACK_AVATAR_DATA_URI, getSyncedExpressionLabel } from '../../core/state.js';
 import { extensionFolderPath } from '../../core/config.js';
 import { saveSettings, getActiveKnownCharacters, getActiveRemovedCharacters, getActiveCharacterColors, saveCharacterRosterChange } from '../../core/persistence.js';
 import { callGenericPopup, POPUP_TYPE } from '../../../../../../popup.js';
@@ -522,8 +522,16 @@ export function updatePortraitBar() {
         }
         const flippedClass = flippedPortraitCards.has(char.name) ? ' dooms-pb-flipped' : '';
 
+        // Tooltip: when the user has opted in, append the current expression
+        // label to the native title attr so hovering the card shows both.
+        let cardTitle = nameEsc;
+        if (extensionSettings.showExpressionInTooltip === true) {
+            const expr = getSyncedExpressionLabel(char.name);
+            if (expr) cardTitle = `${nameEsc} — ${escapeHtml(expr)}`;
+        }
+
         if (portraitSrc) {
-            return `<div class="dooms-portrait-card${speakingClass}${absentClass}${entranceClass}${flippedClass}" title="${nameEsc}" data-char="${nameEsc}">
+            return `<div class="dooms-portrait-card${speakingClass}${absentClass}${entranceClass}${flippedClass}" title="${cardTitle}" data-char="${nameEsc}">
                 <img src="${portraitSrc}" alt="${nameEsc}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
                 <div class="dooms-portrait-card-emoji" style="display:none;">${emoji}</div>
                 ${absentOverlay}
@@ -532,7 +540,7 @@ export function updatePortraitBar() {
                 ${backFace}
             </div>`;
         } else {
-            return `<div class="dooms-portrait-card${speakingClass}${absentClass}${entranceClass}${flippedClass}" title="${nameEsc}" data-char="${nameEsc}">
+            return `<div class="dooms-portrait-card${speakingClass}${absentClass}${entranceClass}${flippedClass}" title="${cardTitle}" data-char="${nameEsc}">
                 <div class="dooms-portrait-card-emoji">${emoji}</div>
                 ${absentOverlay}
                 ${newBadge}

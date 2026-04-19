@@ -325,6 +325,14 @@ export function loadSettings() {
                 extensionSettings.settingsVersion = 16;
                 settingsChanged = true;
             }
+            // Migration to version 17: Initialize show-expression-in-tooltip
+            if (currentVersion < 17) {
+                if (extensionSettings.showExpressionInTooltip === undefined) {
+                    extensionSettings.showExpressionInTooltip = false;
+                }
+                extensionSettings.settingsVersion = 17;
+                settingsChanged = true;
+            }
 
             // Save migrated settings
             if (settingsChanged) {

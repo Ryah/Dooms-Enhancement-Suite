@@ -15,6 +15,7 @@ import {
     setSyncedExpressionPortrait,
     getSyncedExpressionPortrait,
     clearSyncedExpressionPortraits,
+    setSyncedExpressionLabel,
     lastGeneratedData,
     committedTrackerData,
 } from '../../core/state.js';
@@ -374,6 +375,9 @@ export async function classifyAllCharacterExpressions(messageText) {
         const spriteUrl = resolveSpriteUrl(name, label);
         if (spriteUrl) {
             const prev = getSyncedExpressionPortrait(normalizeName(name));
+            // Always track the label so UI can surface it even when the
+            // sprite URL didn't change this turn (e.g. same expression).
+            setSyncedExpressionLabel(normalizeName(name), label);
             if (prev !== spriteUrl) {
                 setSyncedExpressionPortrait(normalizeName(name), spriteUrl);
                 changed = true;

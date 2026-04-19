@@ -480,6 +480,12 @@ async function initUI() {
         saveSettings();
         onHideDefaultExpressionDisplaySettingChanged(extensionSettings.hideDefaultExpressionDisplay);
     });
+    $('#rpg-pb-show-expression-in-tooltip').on('change', function() {
+        extensionSettings.showExpressionInTooltip = $(this).prop('checked');
+        saveSettings();
+        // Rebuild cards so the new title attr takes effect immediately.
+        try { updatePortraitBar(); } catch (e) { console.warn('[Dooms Tracker] updatePortraitBar() after tooltip toggle failed:', e); }
+    });
     $('#rpg-pb-per-chat-tracking').on('change', function() {
         extensionSettings.perChatCharacterTracking = $(this).prop('checked');
         saveSettings();
@@ -1432,6 +1438,7 @@ async function initUI() {
     $('#rpg-expression-batch-mode').prop('checked', extensionSettings.expressionBatchMode !== false);
     $('#rpg-expression-batch-row').toggle((extensionSettings.expressionClassifierApi || 'local') === 'llm');
     $('#rpg-pb-hide-default-expressions').prop('checked', extensionSettings.hideDefaultExpressionDisplay === true);
+    $('#rpg-pb-show-expression-in-tooltip').prop('checked', extensionSettings.showExpressionInTooltip === true);
     $('#rpg-pb-per-chat-tracking').prop('checked', extensionSettings.perChatCharacterTracking === true);
     $('#rpg-pb-card-width').val(pb.cardWidth ?? 110);
     $('#rpg-pb-card-width-value').text((pb.cardWidth ?? 110) + 'px');
