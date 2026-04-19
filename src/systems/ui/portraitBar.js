@@ -165,6 +165,10 @@ export function initPortraitBar() {
         </div>
         <!-- Context menu (hidden by default) -->
         <div id="dooms-pb-context-menu" class="dooms-pb-context-menu" style="display:none;">
+            <div class="dooms-pb-ctx-item" data-action="open-workshop">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Open in Workshop
+            </div>
+            <div class="dooms-pb-ctx-divider"></div>
             <div class="dooms-pb-ctx-item" data-action="upload">
                 <i class="fa-solid fa-image"></i> Upload Portrait
             </div>
@@ -287,6 +291,8 @@ export function initPortraitBar() {
         $menu.find('[data-action="clear-color"]').toggle(!!ctxColors[characterName]);
         // Show "Character Sheet" only when Bunny Mo integration is enabled
         $menu.find('[data-action="character-sheet"]').toggle(!!extensionSettings.bunnyMoIntegration);
+        // Show "Open in Workshop" unless explicitly disabled via feature flag.
+        $menu.find('[data-action="open-workshop"]').toggle(extensionSettings.characterWorkshopEnabled !== false);
 
         // Position near the cursor, clamped to viewport
         $menu.css({ display: 'block', top: 0, left: 0 });
@@ -334,6 +340,8 @@ export function initPortraitBar() {
             openCharacterSheet(characterName);
         } else if (action === 'open-expressions') {
             openExpressionFolder(characterName);
+        } else if (action === 'open-workshop') {
+            window.dispatchEvent(new CustomEvent('dooms:open-workshop', { detail: { characterName } }));
         }
     });
 
