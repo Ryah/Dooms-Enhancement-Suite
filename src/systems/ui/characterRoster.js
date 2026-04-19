@@ -38,6 +38,9 @@ export function initCharacterRoster() {
     // The button lives inside the settings popup template; delegate from
     // document so we catch clicks even if the popup is re-rendered.
     $(document).on('click.cr', '#rpg-open-character-roster', () => openCharacterRoster());
+    // Portrait-bar header button opens via a decoupled window event so
+    // portraitBar.js doesn't need to import this module.
+    window.addEventListener('dooms:open-roster', () => openCharacterRoster());
 }
 
 export function openCharacterRoster() {

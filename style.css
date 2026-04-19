@@ -19945,3 +19945,17 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
 #character-workshop-popup label.rpg-btn {
     user-select: none;
 }
+
+/* Portrait-bar "Open Roster" header button — reuses .dooms-pb-restore-btn
+   layout but swaps the green tint for the theme's border color so it
+   reads as a neutral action, not a destructive/additive one. */
+.dooms-pb-roster-btn {
+    border-color: rgba(74, 123, 167, 0.5);
+    color: rgba(255, 255, 255, 0.75);
+    margin-left: 4px;
+}
+.dooms-pb-roster-btn:hover {
+    border-color: var(--rpg-highlight, #e94560);
+    color: var(--rpg-highlight, #e94560);
+    background: rgba(255, 255, 255, 0.04);
+}

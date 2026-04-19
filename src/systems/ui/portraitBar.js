@@ -157,6 +157,9 @@ export function initPortraitBar() {
                     <button class="dooms-pb-restore-btn" id="dooms-pb-restore-btn" title="Restore removed characters" style="display:none;">
                         <i class="fa-solid fa-user-plus"></i>
                     </button>
+                    <button class="dooms-pb-restore-btn dooms-pb-roster-btn" id="dooms-pb-open-roster" title="Open Character Roster" type="button">
+                        <i class="fa-solid fa-users-rectangle"></i>
+                    </button>
                 </div>
                 <button class="dooms-pb-arrow dooms-pb-left" id="dooms-pb-left"><i class="fa-solid fa-chevron-left"></i></button>
                 <button class="dooms-pb-arrow dooms-pb-right" id="dooms-pb-right"><i class="fa-solid fa-chevron-right"></i></button>
@@ -353,6 +356,17 @@ export function initPortraitBar() {
         setCharacterColor(characterName, color);
         hideContextMenu();
     });
+
+    // ── Open Character Roster button ──
+    $('#dooms-pb-open-roster').on('click', function (e) {
+        e.stopPropagation();
+        if (extensionSettings.characterWorkshopEnabled === false) return;
+        window.dispatchEvent(new CustomEvent('dooms:open-roster'));
+    });
+    // Hide the roster button entirely if the workshop feature is disabled.
+    if (extensionSettings.characterWorkshopEnabled === false) {
+        $('#dooms-pb-open-roster').hide();
+    }
 
     // ── Restore removed characters button ──
     $('#dooms-pb-restore-btn').on('click', function (e) {
