@@ -13,6 +13,23 @@ import { extensionSettings } from '../../core/state.js';
 import { saveSettings } from '../../core/persistence.js';
 import { clearPortraitCache, updatePortraitBar } from './portraitBar.js';
 import { getCharacterSheet, saveCharacterSheet } from './characterSheet.js';
+import { i18n } from '../../core/i18n.js';
+
+function t(key, fallback, vars) {
+    let s;
+    try {
+        s = i18n?.getTranslation?.(key);
+    } catch (e) {
+        s = null;
+    }
+    if (!s) s = fallback;
+    if (vars && typeof s === 'string') {
+        for (const [k, v] of Object.entries(vars)) {
+            s = s.split(`{${k}}`).join(v);
+        }
+    }
+    return s;
+}
 
 // Dialogue color palette copied verbatim from portraitBar.js:29-38.
 const DIALOGUE_COLORS = [
@@ -249,7 +266,7 @@ function renderSheet() {
         );
         $sec.find('.emoji').text(section.emoji || '');
         $sec.find('.num').text(`${num} / ${total}`);
-        $sec.find('.title').text(section.title || '(untitled)');
+        $sec.find('.title').text(section.title || t('characterWorkshop.untitledSection', '(untitled)'));
         $list.append($sec);
     });
     // Expand the first section by default so users see editable state.
@@ -365,7 +382,7 @@ function bindStaticListeners() {
         // Live-update the header preview so the user sees their edit
         const $sec = $(this).closest('.rpg-sheet-section');
         if (field === 'emoji') $sec.find('.rpg-sheet-section-header .emoji').text(sec.emoji || '');
-        if (field === 'title') $sec.find('.rpg-sheet-section-header .title').text(sec.title || '(untitled)');
+        if (field === 'title') $sec.find('.rpg-sheet-section-header .title').text(sec.title || t('characterWorkshop.untitledSection', '(untitled)'));
     });
 
     // Sheet: delete a section
@@ -400,7 +417,11 @@ function bindStaticListeners() {
     $modal.on('click.cw', '#cw-delete', () => {
         if (!draft) return;
         const name = draft.name;
-        const ok = window.confirm(`Delete "${name}" from this chat's roster?\n\nThis removes the portrait, dialogue color, and known-character entry. Sheet data is kept.`);
+        const ok = window.confirm(t(
+            'characterWorkshop.confirmDelete',
+            `Delete "{name}" from this chat's roster?\n\nThis removes the portrait, dialogue color, and known-character entry. Sheet data is kept.`,
+            { name },
+        ));
         if (!ok) return;
         deleteCharacter(name);
         closeCharacterWorkshop();
