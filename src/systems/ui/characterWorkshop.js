@@ -12,6 +12,7 @@
 import { extensionSettings } from '../../core/state.js';
 import { saveSettings } from '../../core/persistence.js';
 import { clearPortraitCache, updatePortraitBar } from './portraitBar.js';
+import { getCharacterSheet, saveCharacterSheet } from './characterSheet.js';
 
 // Dialogue color palette copied verbatim from portraitBar.js:29-38.
 const DIALOGUE_COLORS = [
@@ -66,7 +67,8 @@ export function openCharacterWorkshop(characterName) {
     renderTitle();
     renderIdentity();
     renderAppearance();
-    // Sheet + Trackers rendering lands in cw-6 and cw-7.
+    renderSheet();
+    // Trackers rendering lands in cw-7.
 
     // Reset to the Identity pane every open.
     activatePane('identity');
@@ -116,13 +118,21 @@ function buildDraft(name) {
     // volatile and may not be available at workshop-open time; we fall back
     // to empty and the UI simply shows no chip selected.
     const relationship = resolveCurrentRelationship(name);
+    // Deep-clone the sheet so edits don't mutate the live chat_metadata
+    // object until the user clicks Save.
+    const existingSheet = getCharacterSheet(name);
+    const sheet = existingSheet
+        ? JSON.parse(JSON.stringify(existingSheet))
+        : { characterTitle: name, sections: [] };
+    if (!Array.isArray(sheet.sections)) sheet.sections = [];
     return {
         name,
         color,
         avatar,
         avatarFullRes,
         relationship,
-        dirty: { color: false, avatar: false },
+        sheet,
+        dirty: { color: false, avatar: false, sheet: false },
     };
 }
 
@@ -197,6 +207,60 @@ function renderAppearance() {
         });
         $palette.append($sw);
     }
+}
+
+function renderSheet() {
+    const $list = $modal.find('#cw-sheet-list').empty();
+    const sections = draft.sheet.sections || [];
+    const total = sections.length;
+    sections.forEach((section, idx) => {
+        const emoji = escapeAttr(section.emoji || '');
+        const title = escapeAttr(section.title || '');
+        const content = escapeHtml(section.content || '');
+        const num = section.number != null ? section.number : (idx + 1);
+        const $sec = $(
+            `<div class="rpg-sheet-section" data-section-idx="${idx}">
+                <div class="rpg-sheet-section-header">
+                    <span class="chev" aria-hidden="true">&#9656;</span>
+                    <span class="emoji"></span>
+                    <span class="num"></span>
+                    <span class="title"></span>
+                </div>
+                <div class="rpg-sheet-section-body">
+                    <div class="rpg-field-row">
+                        <div class="rpg-field">
+                            <label>Emoji</label>
+                            <input class="rpg-input cw-sheet-input" type="text" data-section-idx="${idx}" data-section-field="emoji" value="${emoji}" style="text-align:center;">
+                        </div>
+                        <div class="rpg-field" style="flex:2;">
+                            <label>Title</label>
+                            <input class="rpg-input cw-sheet-input" type="text" data-section-idx="${idx}" data-section-field="title" value="${title}">
+                        </div>
+                    </div>
+                    <div class="rpg-field">
+                        <label>Content</label>
+                        <textarea class="rpg-textarea cw-sheet-input" rows="4" data-section-idx="${idx}" data-section-field="content">${content}</textarea>
+                    </div>
+                    <div class="rpg-field" style="margin-top:0.4rem;">
+                        <button type="button" class="rpg-btn rpg-btn-danger cw-sheet-delete" data-section-idx="${idx}">Delete section</button>
+                    </div>
+                </div>
+            </div>`
+        );
+        $sec.find('.emoji').text(section.emoji || '');
+        $sec.find('.num').text(`${num} / ${total}`);
+        $sec.find('.title').text(section.title || '(untitled)');
+        $list.append($sec);
+    });
+    // Expand the first section by default so users see editable state.
+    $list.find('.rpg-sheet-section').first().addClass('open');
+}
+
+function escapeAttr(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function applyPreviewColor(hex) {
@@ -274,6 +338,50 @@ function bindStaticListeners() {
         $modal.find('#cw-preview-placeholder').show();
     });
 
+    // Sheet: accordion toggle (only when clicking the header itself, not inputs)
+    $modal.on('click.cw', '.rpg-sheet-section-header', function (e) {
+        // Avoid toggling if the click originated inside an input/textarea
+        if ($(e.target).closest('input, textarea, button').length) return;
+        $(this).parent().toggleClass('open');
+    });
+
+    // Sheet: edit any section field
+    $modal.on('input.cw change.cw', '.cw-sheet-input', function () {
+        if (!draft) return;
+        const idx = parseInt($(this).attr('data-section-idx'), 10);
+        const field = $(this).attr('data-section-field');
+        if (!Number.isFinite(idx) || !field) return;
+        const sec = draft.sheet.sections[idx];
+        if (!sec) return;
+        sec[field] = $(this).val();
+        draft.dirty.sheet = true;
+        // Live-update the header preview so the user sees their edit
+        const $sec = $(this).closest('.rpg-sheet-section');
+        if (field === 'emoji') $sec.find('.rpg-sheet-section-header .emoji').text(sec.emoji || '');
+        if (field === 'title') $sec.find('.rpg-sheet-section-header .title').text(sec.title || '(untitled)');
+    });
+
+    // Sheet: delete a section
+    $modal.on('click.cw', '.cw-sheet-delete', function () {
+        if (!draft) return;
+        const idx = parseInt($(this).attr('data-section-idx'), 10);
+        if (!Number.isFinite(idx)) return;
+        draft.sheet.sections.splice(idx, 1);
+        draft.dirty.sheet = true;
+        renderSheet();
+    });
+
+    // Sheet: add a new section
+    $modal.on('click.cw', '#cw-sheet-add', () => {
+        if (!draft) return;
+        const next = (draft.sheet.sections?.length || 0) + 1;
+        draft.sheet.sections.push({ number: next, emoji: '', title: '', content: '' });
+        draft.dirty.sheet = true;
+        renderSheet();
+        // Open the newly added (last) section
+        $modal.find('.rpg-sheet-section').removeClass('open').last().addClass('open');
+    });
+
     // Save
     $modal.on('click.cw', '#cw-save', () => {
         if (!draft) return;
@@ -320,13 +428,33 @@ function commitDraft() {
         changed = true;
     }
 
-    if (!changed) return;
-    saveSettings();
-    try {
-        clearPortraitCache();
-        updatePortraitBar();
-    } catch (e) {
-        console.warn('[Dooms Tracker] Workshop: failed to refresh portrait bar after save', e);
+    if (changed) {
+        saveSettings();
+        try {
+            clearPortraitCache();
+            updatePortraitBar();
+        } catch (e) {
+            console.warn('[Dooms Tracker] Workshop: failed to refresh portrait bar after save', e);
+        }
+    }
+
+    if (draft.dirty.sheet) {
+        // Renormalize section numbers so they're sequential after edits/deletes.
+        const sections = (draft.sheet.sections || []).map((s, i) => ({
+            number: i + 1,
+            emoji: s.emoji || '',
+            title: s.title || '',
+            content: s.content || '',
+        }));
+        const payload = {
+            characterTitle: draft.sheet.characterTitle || name,
+            sections,
+        };
+        try {
+            saveCharacterSheet(name, payload);
+        } catch (e) {
+            console.warn('[Dooms Tracker] Workshop: saveCharacterSheet failed', e);
+        }
     }
 }
 
