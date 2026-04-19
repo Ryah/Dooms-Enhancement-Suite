@@ -87,6 +87,7 @@ import {
     applyPortraitBarSettings
 } from './src/systems/ui/portraitBar.js';
 import { initCharacterWorkshop } from './src/systems/ui/characterWorkshop.js';
+import { initCharacterRoster } from './src/systems/ui/characterRoster.js';
 import {
     initWeatherEffects,
     updateWeatherEffect,
@@ -1633,6 +1634,7 @@ async function initUI() {
     try { initPortraitBar(); console.log('[Dooms Tracker] initPortraitBar() OK'); } catch(e) { console.error('[Dooms Tracker] initPortraitBar() FAILED:', e); }
     try { initCharacterSheet(); console.log('[Dooms Tracker] initCharacterSheet() OK'); } catch(e) { console.error('[Dooms Tracker] initCharacterSheet() FAILED:', e); }
     try { initCharacterWorkshop(); console.log('[Dooms Tracker] initCharacterWorkshop() OK'); } catch(e) { console.error('[Dooms Tracker] initCharacterWorkshop() FAILED:', e); }
+    try { initCharacterRoster(); console.log('[Dooms Tracker] initCharacterRoster() OK'); } catch(e) { console.error('[Dooms Tracker] initCharacterRoster() FAILED:', e); }
     try { initExpressionSync(); console.log('[Dooms Tracker] initExpressionSync() OK'); } catch(e) { console.error('[Dooms Tracker] initExpressionSync() FAILED:', e); }
     try { initWeatherEffects(); console.log('[Dooms Tracker] initWeatherEffects() OK'); } catch(e) { console.error('[Dooms Tracker] initWeatherEffects() FAILED:', e); }
     // Add settings button as a fixed-position element on <body> so it's

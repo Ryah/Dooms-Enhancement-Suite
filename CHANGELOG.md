@@ -4,6 +4,7 @@
 
 ### Added
 - **Character Workshop** — a unified per-character editor modal. Right-click a portrait and pick **Open in Workshop** to edit that character's dialogue color, portrait, and Bunny Mo character sheet from one screen. Split-pane layout with a live portrait preview in the left rail; edits are staged until you click **Save** (Cancel throws them away). The Trackers tab explains that per-turn tracker values are AI-generated and routes you to the existing Tracker Editor for field-definition changes. Feature-flagged behind `extensionSettings.characterWorkshopEnabled` (default `true`).
+- **Character Roster** — a grid view of every character with a saved portrait, color, or roster entry. Opens from **Open Character Roster** in the Present Characters Panel accordion in settings. Click a tile to open that character in the Workshop; click **+ New Character** to add a brand-new one by name. Includes live search.
 
 ## [1.5.7] - 2026-02-23
 

@@ -295,6 +295,14 @@
                     <i class="fa-solid fa-chevron-down rpg-accordion-chevron"></i>
                 </div>
                 <div class="rpg-accordion-body">
+                    <div class="rpg-subsection-label">Workshop</div>
+                    <div class="rpg-setting-row">
+                        <button id="rpg-open-character-roster" class="rpg-accordion-action-btn" type="button">
+                            <i class="fa-solid fa-users-rectangle"></i> Open Character Roster
+                        </button>
+                    </div>
+                    <p class="rpg-note-text" style="margin-top:4px;">Browse every character, edit one, or add a new one. Opens the Character Workshop on click.</p>
+
                     <div class="rpg-subsection-label">Layout</div>
                     <div class="rpg-setting-row">
                         <div class="rpg-setting-label-group">
@@ -2060,6 +2068,47 @@
             <button class="rpg-btn rpg-btn-primary" type="button" id="cw-save">Save</button>
         </footer>
 
+    </section>
+</div>
+
+<!-- ============================================================================ -->
+<!-- Character Roster Modal (list view of all known characters)                    -->
+<!-- Populated dynamically by characterRoster.js; hidden until .is-open is added.  -->
+<!-- ============================================================================ -->
+<div id="character-roster-popup" class="rpg-settings-popup" role="dialog" aria-modal="true" aria-label="Character Roster">
+    <section class="rpg-settings-popup-content cr-content">
+        <header class="rpg-settings-popup-header">
+            <h3>
+                <i class="fa-solid fa-users-rectangle" aria-hidden="true"></i>
+                <span>Character Roster</span>
+            </h3>
+            <button class="rpg-popup-close" id="cr-close" type="button" aria-label="Close">&times;</button>
+        </header>
+
+        <div class="cr-subheader">
+            <div class="cr-search-wrap">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input id="cr-search" class="rpg-input cr-search-input" type="search" placeholder="Search characters&hellip;" autocomplete="off">
+            </div>
+            <span class="cr-count" id="cr-count" aria-live="polite"></span>
+        </div>
+
+        <div class="rpg-settings-popup-body cr-body">
+            <div id="cr-grid" class="cr-grid" role="list"></div>
+            <div id="cr-empty" class="cr-empty" hidden>
+                <i class="fa-regular fa-face-meh" aria-hidden="true"></i>
+                <p>No characters match that search.</p>
+            </div>
+        </div>
+
+        <footer class="rpg-settings-popup-footer">
+            <button class="rpg-btn rpg-btn-ghost" type="button" id="cr-footer-close">Close</button>
+            <span class="spacer"></span>
+            <span class="cr-tip muted">
+                <i class="fa-regular fa-lightbulb" aria-hidden="true"></i>
+                Tip: right-click a portrait in chat for quick per-character edits.
+            </span>
+        </footer>
     </section>
 </div>
 
