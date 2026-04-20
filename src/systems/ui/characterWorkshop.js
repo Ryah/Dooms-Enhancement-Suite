@@ -12,13 +12,15 @@
  * ('dooms:open-workshop') so portraitBar does not import this module.
  */
 
-import { extensionSettings } from '../../core/state.js';
+import { extensionSettings, lastGeneratedData, updateLastGeneratedData } from '../../core/state.js';
 import {
     saveSettings,
+    saveChatData,
     getActiveKnownCharacters,
     saveCharacterRosterChange,
 } from '../../core/persistence.js';
 import { clearPortraitCache, updatePortraitBar, openExpressionFolder } from './portraitBar.js';
+import { renderThoughts } from '../rendering/thoughts.js';
 import { i18n } from '../../core/i18n.js';
 import { getAllWorldNames, activateWorld, isWorldActive } from '../lorebook/lorebookAPI.js';
 import {
@@ -646,6 +648,13 @@ function injectIntoScene(name) {
         console.warn('[Dooms Tracker] Workshop: failed to add to roster before inject', e);
     }
 
+    // 1b. Mark the character as PRESENT in the current scene immediately so
+    //     the Present Characters panel highlights them right away, instead
+    //     of waiting for the next AI turn to put them into characterThoughts.
+    try { markCharacterPresentNow(trimmed); } catch (e) {
+        console.warn('[Dooms Tracker] Workshop: failed to mark character present', e);
+    }
+
     // 2. Resolve any persisted injection extras (description + lorebook + relationship).
     const stored = extensionSettings?.characterInjection?.[trimmed] || {};
     const description = (draft.injection?.description ?? stored.description ?? '').trim();
@@ -713,6 +722,59 @@ function injectIntoScene(name) {
     } catch (e) {
         // toastr optional
     }
+}
+
+/**
+ * Mark a character as present in the live scene by splicing them into
+ * lastGeneratedData.characterThoughts (the source of truth for
+ * getCharacterList() and the Present Characters panel). Persists through
+ * saveChatData so the state survives a reload until the next AI turn
+ * either confirms or drops the character.
+ */
+function markCharacterPresentNow(name) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return;
+
+    const raw = lastGeneratedData?.characterThoughts;
+    let parsed;
+    try {
+        parsed = (typeof raw === 'string' && raw)
+            ? JSON.parse(raw)
+            : (raw && typeof raw === 'object' ? raw : { characters: [] });
+    } catch (e) {
+        parsed = { characters: [] };
+    }
+    if (!parsed || typeof parsed !== 'object') parsed = { characters: [] };
+    if (!Array.isArray(parsed.characters)) parsed.characters = [];
+
+    const lower = trimmed.toLowerCase();
+    const existing = parsed.characters.find(c => typeof c?.name === 'string' && c.name.toLowerCase() === lower);
+    if (!existing) {
+        // Build a minimal "present" entry. thoughts stays empty so the
+        // existing off-scene pattern filter in getCharacterList doesn't
+        // accidentally exclude them.
+        const rel = extensionSettings?.characterRelationships?.[trimmed];
+        parsed.characters.push({
+            name: trimmed,
+            emoji: '🙂',
+            thoughts: { content: '' },
+            ...(rel ? { relationship: { status: rel } } : {}),
+        });
+    }
+
+    // Write back in the same shape the rest of the codebase expects
+    // (characterThoughts is normally a JSON string).
+    const serialized = JSON.stringify(parsed);
+    try { updateLastGeneratedData({ characterThoughts: serialized }); }
+    catch (e) { console.warn('[Dooms Tracker] Workshop: updateLastGeneratedData failed', e); }
+
+    // Mirror the classic persistence pattern — write to chat_metadata so a
+    // reload keeps the character in the panel until the AI updates it.
+    try { saveChatData(); } catch (e) { /* best-effort */ }
+
+    // Refresh the UI surfaces that key off the present list.
+    try { clearPortraitCache(); updatePortraitBar(); } catch (e) {}
+    try { renderThoughts(); } catch (e) {}
 }
 
 /**
