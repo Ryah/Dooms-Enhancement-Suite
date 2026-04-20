@@ -20167,7 +20167,7 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     --dooms-pb-side-cols: 1; /* overridden by JS to 1, 2, or 3 */
     --dooms-pb-side-gap: 8px;
     --dooms-pb-side-pad: 10px;
-    --dooms-pb-side-toggle-h: 28px;
+    --dooms-pb-side-toggle-w: 22px;
     --dooms-pb-side-card-w: var(--dooms-pb-card-w, 110px);
 
     position: fixed;
@@ -20178,9 +20178,11 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
         var(--dooms-pb-side-cols) * var(--dooms-pb-side-card-w)
         + (var(--dooms-pb-side-cols) - 1) * var(--dooms-pb-side-gap)
         + var(--dooms-pb-side-pad) * 2
+        + var(--dooms-pb-side-toggle-w)
     );
+    /* Side mode lays out wrapper as a row: cards-pane + toggle handle. */
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -20218,46 +20220,72 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     display: none;
 }
 
-/* Scroll container becomes a vertical CSS grid with N columns */
+/* Scroll container becomes a vertical CSS grid with N columns at the
+   character cards' natural width — preserves the same 110x150 portrait
+   shape used by horizontal mode instead of stretching/squashing them. */
 #dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-scroll,
 #dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-scroll {
     display: grid;
-    grid-template-columns: repeat(var(--dooms-pb-side-cols), 1fr);
+    grid-template-columns: repeat(var(--dooms-pb-side-cols), var(--dooms-pb-card-w, 110px));
     gap: var(--dooms-pb-side-gap);
     overflow-y: auto;
     overflow-x: hidden;
     align-content: start;
-    justify-content: stretch;
+    justify-content: center;
     flex: 1 1 auto;
     min-height: 0;
 }
-#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-portrait-card,
-#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-portrait-card {
-    width: 100%;            /* fill the column */
-    aspect-ratio: var(--dooms-pb-card-w, 110) / var(--dooms-pb-card-h, 150);
-    height: auto;           /* derive from aspect-ratio */
-}
+/* Cards keep their existing --dooms-pb-card-w/h sizing — no overrides. */
 
-/* Repurpose the existing toggle as a collapse handle attached to the
-   inner edge of the panel. Kept narrow so it doesn't eat much width. */
+/* Toggle as a thin vertical strip on the chat-facing edge of the panel.
+   Left mode: handle on the right side (order: 2, after the bar).
+   Right mode: handle on the left side (order: 0, before the bar). */
 #dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-toggle,
 #dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-toggle {
-    flex: 0 0 auto;
-    height: var(--dooms-pb-side-toggle-h);
-    width: 100%;
+    flex: 0 0 var(--dooms-pb-side-toggle-w);
+    width: var(--dooms-pb-side-toggle-w);
+    height: auto;
+    align-self: stretch;
     border-radius: 0;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-toggle  { order: 2; }
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-toggle { order: 0; }
+
+/* Hide the dotted decoration + label in the slim vertical handle. */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-toggle-dots,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-toggle-dots,
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-toggle-label,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-toggle-label {
+    display: none;
 }
 #dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-toggle-chevron,
 #dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-toggle-chevron {
     transition: transform 0.2s;
+    color: rgba(234, 234, 234, 0.7);
 }
-/* Rotate the chevron so it points toward the screen edge in collapsed state */
-#dooms-portrait-bar-wrapper.dooms-pb-position-left.dooms-pb-collapsed-side .dooms-pb-toggle-chevron {
+/* Chevron points outward (toward the panel) when expanded — i.e. clicking
+   collapses; flips to point inward (toward chat) when collapsed — clicking
+   re-opens. */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-toggle-chevron {
     transform: rotate(-90deg);
 }
-#dooms-portrait-bar-wrapper.dooms-pb-position-right.dooms-pb-collapsed-side .dooms-pb-toggle-chevron {
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-toggle-chevron {
     transform: rotate(90deg);
+}
+#dooms-portrait-bar-wrapper.dooms-pb-position-left.dooms-pb-collapsed-side .dooms-pb-toggle-chevron {
+    transform: rotate(90deg);
+}
+#dooms-portrait-bar-wrapper.dooms-pb-position-right.dooms-pb-collapsed-side .dooms-pb-toggle-chevron {
+    transform: rotate(-90deg);
 }
 
 /* Collapsed side mode: shrink the wrapper to a thin strip showing only
@@ -20290,15 +20318,18 @@ body.dooms-pb-side-push-right {
     transition: margin-right 0.2s ease;
 }
 
+/* Right mode bar order — keep toggle on the chat-facing edge. */
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-portrait-bar { order: 1; }
+
 /* Side mode collapsed: shrink wrapper width to just the toggle handle. */
 #dooms-portrait-bar-wrapper.dooms-pb-position-left.dooms-pb-collapsed-side,
 #dooms-portrait-bar-wrapper.dooms-pb-position-right.dooms-pb-collapsed-side {
-    width: var(--dooms-pb-side-toggle-h, 28px);
+    width: var(--dooms-pb-side-toggle-w, 22px);
 }
 /* Push-aside margin shrinks with the collapsed wrapper so chat reflows. */
 body.dooms-pb-side-push-left.dooms-pb-side-push-collapsed {
-    margin-left: var(--dooms-pb-side-toggle-h-fallback, 28px);
+    margin-left: 22px;
 }
 body.dooms-pb-side-push-right.dooms-pb-side-push-collapsed {
-    margin-right: var(--dooms-pb-side-toggle-h-fallback, 28px);
+    margin-right: 22px;
 }
