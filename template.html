@@ -2117,6 +2117,9 @@
 
         <footer class="rpg-settings-popup-footer">
             <button class="rpg-btn rpg-btn-danger" type="button" id="cw-delete">Delete character</button>
+            <button class="rpg-btn" type="button" id="cw-export" title="Download this character's portrait, color, description, and lorebook attachment as a JSON file">
+                <i class="fa-solid fa-file-arrow-down"></i> Export&hellip;
+            </button>
             <span class="spacer"></span>
             <button class="rpg-btn rpg-btn-ghost" type="button" id="cw-cancel">Cancel</button>
             <button class="rpg-btn" type="button" id="cw-inject" title="Bring this character into the scene and tell the AI to incorporate them next turn">
@@ -2166,6 +2169,10 @@
 
         <footer class="rpg-settings-popup-footer">
             <button class="rpg-btn rpg-btn-ghost" type="button" id="cr-footer-close">Close</button>
+            <button class="rpg-btn" type="button" id="cr-import-btn" title="Import a character from a JSON file (exported from another chat or install)">
+                <i class="fa-solid fa-file-arrow-up"></i> Import&hellip;
+            </button>
+            <input id="cr-import-file" type="file" accept="application/json,.json" class="sr-only">
             <span class="spacer"></span>
             <span class="cr-tip muted">
                 <i class="fa-regular fa-lightbulb" aria-hidden="true"></i>

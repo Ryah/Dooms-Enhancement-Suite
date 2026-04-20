@@ -191,6 +191,30 @@ function bindListeners() {
     // "+ New Character" tile
     $modal.on('click.cr', '.cr-tile-new', () => handleNewCharacter());
 
+    // Import from JSON file
+    $modal.on('click.cr', '#cr-import-btn', () => {
+        $modal.find('#cr-import-file').val('').trigger('click');
+    });
+    $modal.on('change.cr', '#cr-import-file', function () {
+        const file = this.files && this.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const payload = JSON.parse(String(ev?.target?.result || ''));
+                importCharacterPayload(payload);
+            } catch (err) {
+                console.warn('[Dooms Tracker] Roster: import JSON parse failed', err);
+                if (window.toastr) window.toastr.error('Could not read that file — make sure it\'s a valid character JSON export.', 'Import failed');
+            }
+            this.value = '';
+        };
+        reader.onerror = () => {
+            if (window.toastr) window.toastr.error('Failed to read the selected file.', 'Import failed');
+        };
+        reader.readAsText(file);
+    });
+
     // Inline new-character dialog
     $modal.on('click.cr', '#cr-newchar-cancel', () => closeNewCharacterDialog());
     $modal.on('click.cr', '#cr-newchar-create', () => commitNewCharacter());
@@ -457,6 +481,89 @@ function confirmAndDelete(name) {
     try {
         if (window.toastr) window.toastr.info(`Deleted "${name}".`, 'Roster', { timeOut: 3000 });
     } catch (e) {}
+}
+
+/**
+ * Ingest a parsed character JSON payload (from Workshop's Export).
+ * Shape is validated loosely — only string fields are copied, and the
+ * caller may conflict-resolve by choosing to overwrite or rename.
+ */
+function importCharacterPayload(payload) {
+    if (!payload || typeof payload !== 'object') {
+        if (window.toastr) window.toastr.error('File isn\'t a character export.', 'Import failed');
+        return;
+    }
+    const rawName = typeof payload.name === 'string' ? payload.name.trim() : '';
+    if (!rawName) {
+        if (window.toastr) window.toastr.error('Export is missing a character name.', 'Import failed');
+        return;
+    }
+
+    // Conflict detection: if a character with this name (case-insensitive)
+    // already exists in any store we'd write to, prompt the user.
+    const existing = collectCharacterNames();
+    const clash = existing.find(n => n.toLowerCase() === rawName.toLowerCase());
+
+    let targetName = rawName;
+    if (clash) {
+        const choice = window.confirm(
+            `A character named "${clash}" already exists.\n\n` +
+            `OK  = overwrite "${clash}" with the imported data\n` +
+            `Cancel = import under a new name ("${rawName} (imported)")`
+        );
+        if (!choice) {
+            targetName = `${rawName} (imported)`;
+            let suffix = 2;
+            while (existing.some(n => n.toLowerCase() === targetName.toLowerCase())) {
+                targetName = `${rawName} (imported ${suffix++})`;
+            }
+        } else {
+            targetName = clash; // keep existing casing
+        }
+    }
+
+    // Copy fields defensively.
+    if (!extensionSettings.knownCharacters) extensionSettings.knownCharacters = {};
+    if (!extensionSettings.knownCharacters[targetName]) {
+        extensionSettings.knownCharacters[targetName] = { emoji: '❓' };
+    }
+
+    const color = typeof payload.color === 'string' ? payload.color.trim() : '';
+    if (color) {
+        if (!extensionSettings.characterColors) extensionSettings.characterColors = {};
+        extensionSettings.characterColors[targetName] = color;
+    }
+
+    const avatar = typeof payload.avatar === 'string' ? payload.avatar : '';
+    const avatarFull = typeof payload.avatarFullRes === 'string' ? payload.avatarFullRes : '';
+    if (avatar) {
+        if (!extensionSettings.npcAvatars) extensionSettings.npcAvatars = {};
+        if (!extensionSettings.npcAvatarsFullRes) extensionSettings.npcAvatarsFullRes = {};
+        extensionSettings.npcAvatars[targetName] = avatar;
+        extensionSettings.npcAvatarsFullRes[targetName] = avatarFull || avatar;
+    }
+
+    const inj = payload.injection && typeof payload.injection === 'object' ? payload.injection : null;
+    if (inj) {
+        const desc = typeof inj.description === 'string' ? inj.description.trim() : '';
+        const book = typeof inj.lorebook === 'string' ? inj.lorebook.trim() : '';
+        if (desc || book) {
+            if (!extensionSettings.characterInjection) extensionSettings.characterInjection = {};
+            extensionSettings.characterInjection[targetName] = { description: desc, lorebook: book };
+        }
+    }
+
+    saveSettings();
+    try {
+        clearPortraitCache();
+        updatePortraitBar();
+    } catch (e) {
+        console.warn('[Dooms Tracker] Roster: failed to refresh portrait bar after import', e);
+    }
+    renderGrid();
+    if (window.toastr) {
+        window.toastr.success(`Imported "${targetName}".`, 'Character Workshop', { timeOut: 4000 });
+    }
 }
 
 function purgeCharacter(name) {

@@ -476,6 +476,16 @@ function bindStaticListeners() {
         closeCharacterWorkshop();
     });
 
+    $modal.on('click.cw', '#cw-export', () => {
+        if (!draft) return;
+        try {
+            exportDraft();
+        } catch (e) {
+            console.warn('[Dooms Tracker] Workshop: export failed', e);
+            if (window.toastr) window.toastr.error('Export failed — see console for details.', 'Character Workshop');
+        }
+    });
+
     $modal.on('click.cw', '#cw-delete', () => {
         if (!draft) return;
         const name = draft.name;
@@ -638,6 +648,37 @@ function injectIntoScene(name) {
         }
     } catch (e) {
         // toastr optional
+    }
+}
+
+function exportDraft() {
+    if (!draft) return;
+    const payload = {
+        $schema: 'dooms-character-v1',
+        name: draft.name,
+        color: draft.color || '',
+        avatar: draft.avatar || '',
+        avatarFullRes: draft.avatarFullRes || '',
+        injection: {
+            description: draft.injection?.description || '',
+            lorebook: draft.injection?.lorebook || '',
+        },
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const safeName = String(draft.name || 'character').replace(/[^\w.-]+/g, '_');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `character-${safeName}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+    if (window.toastr) {
+        window.toastr.success(`Exported "${draft.name}" to character-${safeName}.json`, 'Character Workshop', { timeOut: 4000 });
     }
 }
 
