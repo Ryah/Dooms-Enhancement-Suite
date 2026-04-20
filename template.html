@@ -401,7 +401,7 @@
                             <ol>
                                 <li>Open the character in <strong>Character Workshop</strong> &rarr; <strong>Appearance</strong> tab.</li>
                                 <li>Click <strong>Open expression folder</strong>.</li>
-                                <li>Drop PNG files <strong>directly into that folder</strong> (not into a sub-folder). Name them after the emotion: <code>happy.png</code>, <code>sad.png</code>, <code>angry.png</code>, <code>neutral.png</code>, <code>surprised.png</code>, etc.</li>
+                                <li>Drop image files <strong>directly into that folder</strong> (not into a sub-folder). <code>.png</code> and <code>.webp</code> both work. Name them after the emotion the classifier outputs: <code>joy</code>, <code>sadness</code>, <code>annoyance</code>, <code>optimism</code>, <code>neutral</code>, <code>love</code>, <code>nervousness</code>, <code>relief</code>, <code>remorse</code>, <code>realization</code>, <code>surprise</code>, etc. &mdash; e.g. <code>joy.webp</code>, <code>sadness.png</code>.</li>
                                 <li>Reload SillyTavern. The next AI message will start swapping sprites automatically.</li>
                             </ol>
                             <p class="rpg-section-info-tip"><i class="fa-solid fa-lightbulb"></i> Turn on <strong>Show Expression in Tooltip</strong> below to see which label was picked when you hover a portrait.</p>
@@ -2087,7 +2087,7 @@
                     </div>
                     <div class="rpg-editor-section">
                         <h4>Expressions</h4>
-                        <p class="helper">Expression sprites live in <code>data/default-user/characters/&lt;name&gt;/</code>. Open the folder to add <code>happy.png</code>, <code>sad.png</code>, etc.; DES's expression sync will pick them up automatically.</p>
+                        <p class="helper">Expression sprites live in <code>data/default-user/characters/&lt;name&gt;/</code>. Open the folder to add images named after the classifier's emotion labels &mdash; e.g. <code>joy.webp</code>, <code>sadness.png</code>, <code>annoyance.webp</code>, <code>optimism.png</code>, <code>neutral.webp</code>, <code>realization.png</code>, <code>surprise.webp</code>, etc. Both <code>.png</code> and <code>.webp</code> are supported. DES's expression sync will pick them up automatically.</p>
                         <div class="stack" style="max-width: 320px;">
                             <button class="rpg-btn" type="button" id="cw-open-expressions">
                                 <i class="fa-solid fa-folder-open"></i> Open expression folder
