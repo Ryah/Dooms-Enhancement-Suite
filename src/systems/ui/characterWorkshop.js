@@ -149,12 +149,15 @@ function buildDraft(name) {
             description: typeof inj.description === 'string' ? inj.description : '',
             lorebook: typeof inj.lorebook === 'string' ? inj.lorebook : '',
         },
-        dirty: { color: false, avatar: false, injection: false },
+        dirty: { color: false, avatar: false, injection: false, relationship: false },
     };
 }
 
 function resolveCurrentRelationship(name) {
-    // Best-effort read of a volatile structure. Never throw.
+    // Persistent user-set override wins over the AI's per-turn classification.
+    const override = extensionSettings?.characterRelationships?.[name];
+    if (typeof override === 'string' && override) return override;
+    // Fallback: best-effort read from the AI's volatile tracker data.
     try {
         const raw = window?.dooms_lastGeneratedData?.characterThoughts;
         if (!raw) return '';
@@ -359,6 +362,31 @@ function bindStaticListeners() {
         commitColorSelection(hex);
     });
 
+    // Relationship chip click — set persistent override. Click again to clear.
+    $modal.on('click.cw', '.rpg-rel-chip', function () {
+        if (!draft) return;
+        const $chip = $(this);
+        const picked = String($chip.attr('data-rel') || '');
+        const current = String(draft.relationship || '');
+        // Toggle off if they clicked the already-selected chip.
+        const next = (current.toLowerCase() === picked.toLowerCase()) ? '' : picked;
+        draft.relationship = next;
+        draft.dirty.relationship = true;
+        // Reflect immediately in the chip row and left-rail preview.
+        $modal.find('.rpg-rel-chip').each(function () {
+            const match = ($(this).attr('data-rel') || '').toLowerCase() === next.toLowerCase() && !!next;
+            $(this).toggleClass('selected', match);
+            $(this).attr('aria-checked', match ? 'true' : 'false');
+        });
+        const $rel = $modal.find('#cw-preview-rel');
+        if (next) {
+            const emoji = $chip.attr('data-emoji') || '';
+            $rel.text(`${emoji} ${next}`.trim());
+        } else {
+            $rel.text('');
+        }
+    });
+
     // Custom-color dropper — opens the native color picker sheet.
     $modal.on('click.cw', '#cw-color-custom-btn', function (e) {
         e.preventDefault();
@@ -528,6 +556,16 @@ function commitDraft() {
         changed = true;
     }
 
+    if (draft.dirty.relationship) {
+        if (!extensionSettings.characterRelationships) extensionSettings.characterRelationships = {};
+        if (draft.relationship) {
+            extensionSettings.characterRelationships[name] = draft.relationship;
+        } else {
+            delete extensionSettings.characterRelationships[name];
+        }
+        changed = true;
+    }
+
     if (draft.dirty.injection) {
         if (!extensionSettings.characterInjection) extensionSettings.characterInjection = {};
         const desc = (draft.injection.description || '').trim();
@@ -560,6 +598,7 @@ function deleteCharacter(name) {
     // injection extras too (description / lorebook attachment) so
     // delete-from-Workshop and delete-from-Roster are symmetric.
     if (extensionSettings.characterInjection) delete extensionSettings.characterInjection[name];
+    if (extensionSettings.characterRelationships) delete extensionSettings.characterRelationships[name];
     saveSettings();
     try {
         clearPortraitCache();
@@ -595,10 +634,11 @@ function injectIntoScene(name) {
         console.warn('[Dooms Tracker] Workshop: failed to add to roster before inject', e);
     }
 
-    // 2. Resolve any persisted injection extras (description + lorebook).
+    // 2. Resolve any persisted injection extras (description + lorebook + relationship).
     const stored = extensionSettings?.characterInjection?.[trimmed] || {};
     const description = (draft.injection?.description ?? stored.description ?? '').trim();
     const lorebook = (draft.injection?.lorebook ?? stored.lorebook ?? '').trim();
+    const relationship = (draft.relationship || extensionSettings?.characterRelationships?.[trimmed] || '').trim();
 
     // 3. If a lorebook is attached and not already active, activate it so
     //    SillyTavern's WI engine pulls from it for the next generation.
@@ -614,7 +654,7 @@ function injectIntoScene(name) {
     }
 
     // 4. One-shot prompt
-    const prompt = buildInjectPrompt(trimmed, { description, lorebook });
+    const prompt = buildInjectPrompt(trimmed, { description, lorebook, relationship });
     try {
         setExtensionPrompt(
             INJECT_SLOT,
@@ -637,6 +677,7 @@ function injectIntoScene(name) {
     try {
         if (window.toastr) {
             const extras = [];
+            if (relationship) extras.push(`relationship=${relationship}`);
             if (description) extras.push('description');
             if (lorebook) extras.push(`lorebook "${lorebook}"`);
             const tail = extras.length ? ` (with ${extras.join(' + ')})` : '';
@@ -659,6 +700,7 @@ function exportDraft() {
         color: draft.color || '',
         avatar: draft.avatar || '',
         avatarFullRes: draft.avatarFullRes || '',
+        relationship: draft.relationship || '',
         injection: {
             description: draft.injection?.description || '',
             lorebook: draft.injection?.lorebook || '',
@@ -685,11 +727,15 @@ function exportDraft() {
 function buildInjectPrompt(name, extras) {
     const description = extras?.description || '';
     const lorebook = extras?.lorebook || '';
+    const relationship = extras?.relationship || '';
     let out =
         `[SCENE DIRECTION — INJECT CHARACTER]\n` +
         `Incorporate the character "${name}" into your next response. ` +
         `Have them arrive, reveal themselves, or otherwise become present in a way that fits the current scene naturally. ` +
         `Include them in your presentCharacters tracker output for this turn.`;
+    if (relationship) {
+        out += `\n\nRelationship to the player: ${relationship}. Reflect this dynamic in how they act and speak.`;
+    }
     if (description) {
         out += `\n\nCharacter notes for "${name}":\n${description}`;
     }

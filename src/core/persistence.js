@@ -366,6 +366,17 @@ export function loadSettings() {
                 extensionSettings.settingsVersion = 20;
                 settingsChanged = true;
             }
+            // Migration to version 21: Initialize characterRelationships —
+            // persistent per-character relationship overrides set from the
+            // Workshop (Lover / Friend / Ally / Enemy / Neutral). When set,
+            // they win over the AI's per-turn classification.
+            if (currentVersion < 21) {
+                if (!extensionSettings.characterRelationships || typeof extensionSettings.characterRelationships !== 'object') {
+                    extensionSettings.characterRelationships = {};
+                }
+                extensionSettings.settingsVersion = 21;
+                settingsChanged = true;
+            }
 
             // Save migrated settings
             if (settingsChanged) {

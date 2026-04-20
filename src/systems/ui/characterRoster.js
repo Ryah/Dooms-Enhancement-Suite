@@ -303,7 +303,10 @@ function collectCharacterNames() {
 }
 
 function resolveRelationshipEmoji(name) {
-    // Best-effort: relationship lives in volatile lastGeneratedData.
+    // Persistent user-set override wins over the AI's per-turn classification.
+    const override = extensionSettings?.characterRelationships?.[name];
+    if (override && REL_EMOJI[override]) return REL_EMOJI[override];
+    // Fallback: best-effort read from volatile lastGeneratedData.
     try {
         const raw = window?.dooms_lastGeneratedData?.characterThoughts;
         if (!raw) return '';
@@ -543,6 +546,14 @@ function importCharacterPayload(payload) {
         extensionSettings.npcAvatarsFullRes[targetName] = avatarFull || avatar;
     }
 
+    const rel = typeof payload.relationship === 'string' ? payload.relationship.trim() : '';
+    const RELS = ['Lover', 'Friend', 'Ally', 'Enemy', 'Neutral'];
+    if (rel && RELS.some(r => r.toLowerCase() === rel.toLowerCase())) {
+        if (!extensionSettings.characterRelationships) extensionSettings.characterRelationships = {};
+        // Canonicalize to the titlecase form the chip row uses.
+        extensionSettings.characterRelationships[targetName] = RELS.find(r => r.toLowerCase() === rel.toLowerCase());
+    }
+
     const inj = payload.injection && typeof payload.injection === 'object' ? payload.injection : null;
     if (inj) {
         const desc = typeof inj.description === 'string' ? inj.description.trim() : '';
@@ -575,6 +586,7 @@ function purgeCharacter(name) {
     if (s.knownCharacters) delete s.knownCharacters[name];
     if (s.heroPositions) delete s.heroPositions[name];
     if (s.characterInjection) delete s.characterInjection[name];
+    if (s.characterRelationships) delete s.characterRelationships[name];
     // Also drop the pin entry so the name doesn't linger as a ghost
     // at the top of the roster.
     if (Array.isArray(s.pinnedCharacters)) {
