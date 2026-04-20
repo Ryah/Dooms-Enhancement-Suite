@@ -20255,20 +20255,28 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     display: none;
 }
 
-/* Scroll container becomes a vertical CSS grid with N columns at the
-   character cards' natural width — preserves the same 110x150 portrait
-   shape used by horizontal mode instead of stretching/squashing them. */
+/* Scroll container is a wrapping flex row so:
+   - Cards keep their natural 110x150 dimensions (no stretch/squash).
+   - Alignment follows the Inline/Centered setting — the shared
+     .dooms-pb-centered class still toggles justify-content.
+   - A partial last row (fewer cards than column count) centers or
+     left-aligns per the setting, instead of always left. */
 #dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-scroll,
 #dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-scroll {
-    display: grid;
-    grid-template-columns: repeat(var(--dooms-pb-side-cols), var(--dooms-pb-card-w, 110px));
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: var(--dooms-pb-side-gap);
     overflow-y: auto;
     overflow-x: hidden;
     align-content: start;
-    justify-content: center;
+    justify-content: flex-start;
     flex: 1 1 auto;
     min-height: 0;
+}
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-scroll.dooms-pb-centered,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-scroll.dooms-pb-centered {
+    justify-content: center;
 }
 /* Cards keep their existing --dooms-pb-card-w/h sizing — no overrides. */
 
