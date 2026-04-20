@@ -20,6 +20,7 @@ import {
 } from '../../core/persistence.js';
 import { clearPortraitCache, updatePortraitBar } from './portraitBar.js';
 import { i18n } from '../../core/i18n.js';
+import { getAllWorldNames, activateWorld, isWorldActive } from '../lorebook/lorebookAPI.js';
 import {
     setExtensionPrompt,
     extension_prompt_types,
@@ -93,6 +94,7 @@ export function openCharacterWorkshop(characterName) {
     renderTitle();
     renderIdentity();
     renderAppearance();
+    renderInjection();
     activatePane('identity');
 
     if (!listenersBound) {
@@ -125,13 +127,18 @@ function ensureModal() {
 }
 
 function buildDraft(name) {
+    const inj = extensionSettings?.characterInjection?.[name] || {};
     return {
         name,
         color: extensionSettings?.characterColors?.[name] || '',
         avatar: extensionSettings?.npcAvatars?.[name] || '',
         avatarFullRes: extensionSettings?.npcAvatarsFullRes?.[name] || '',
         relationship: resolveCurrentRelationship(name),
-        dirty: { color: false, avatar: false },
+        injection: {
+            description: typeof inj.description === 'string' ? inj.description : '',
+            lorebook: typeof inj.lorebook === 'string' ? inj.lorebook : '',
+        },
+        dirty: { color: false, avatar: false, injection: false },
     };
 }
 
@@ -200,6 +207,37 @@ function renderAppearance() {
     }
 }
 
+function renderInjection() {
+    $modal.find('#cw-inj-description').val(draft.injection.description || '');
+
+    // Repopulate the lorebook dropdown each open so newly-created
+    // SillyTavern lorebooks show up without needing a reload.
+    const $select = $modal.find('#cw-inj-lorebook').empty();
+    $select.append('<option value="">— None —</option>');
+    let names = [];
+    try {
+        names = getAllWorldNames() || [];
+    } catch (e) {
+        console.warn('[Dooms Tracker] Workshop: getAllWorldNames failed', e);
+    }
+    for (const wname of names) {
+        const opt = document.createElement('option');
+        opt.value = wname;
+        opt.textContent = wname;
+        $select.append(opt);
+    }
+    // If a previously-saved lorebook is no longer present (renamed/deleted),
+    // keep the option visible but flagged so the user can see it's stale.
+    const saved = draft.injection.lorebook;
+    if (saved && !names.includes(saved)) {
+        const opt = document.createElement('option');
+        opt.value = saved;
+        opt.textContent = `${saved} (missing)`;
+        $select.append(opt);
+    }
+    $select.val(saved || '');
+}
+
 function applyPreviewColor(hex) {
     $modal.find('#cw-preview-card-name').css('color', hex);
     $modal.find('#cw-preview-name').css('color', hex);
@@ -256,6 +294,18 @@ function bindStaticListeners() {
         };
         reader.onerror = () => console.warn('[Dooms Tracker] Failed to read portrait file');
         reader.readAsDataURL(file);
+    });
+
+    $modal.on('input.cw change.cw', '#cw-inj-description', function () {
+        if (!draft) return;
+        draft.injection.description = String($(this).val() || '');
+        draft.dirty.injection = true;
+    });
+
+    $modal.on('change.cw', '#cw-inj-lorebook', function () {
+        if (!draft) return;
+        draft.injection.lorebook = String($(this).val() || '');
+        draft.dirty.injection = true;
     });
 
     $modal.on('click.cw', '#cw-portrait-clear', () => {
@@ -323,6 +373,18 @@ function commitDraft() {
         changed = true;
     }
 
+    if (draft.dirty.injection) {
+        if (!extensionSettings.characterInjection) extensionSettings.characterInjection = {};
+        const desc = (draft.injection.description || '').trim();
+        const book = (draft.injection.lorebook || '').trim();
+        if (desc || book) {
+            extensionSettings.characterInjection[name] = { description: desc, lorebook: book };
+        } else {
+            delete extensionSettings.characterInjection[name];
+        }
+        changed = true;
+    }
+
     if (!changed) return;
     saveSettings();
     try {
@@ -374,10 +436,27 @@ function injectIntoScene(name) {
         console.warn('[Dooms Tracker] Workshop: failed to add to roster before inject', e);
     }
 
-    // 2. One-shot prompt
-    const prompt = buildInjectPrompt(trimmed);
+    // 2. Resolve any persisted injection extras (description + lorebook).
+    const stored = extensionSettings?.characterInjection?.[trimmed] || {};
+    const description = (draft.injection?.description ?? stored.description ?? '').trim();
+    const lorebook = (draft.injection?.lorebook ?? stored.lorebook ?? '').trim();
+
+    // 3. If a lorebook is attached and not already active, activate it so
+    //    SillyTavern's WI engine pulls from it for the next generation.
+    if (lorebook) {
+        try {
+            if (typeof isWorldActive === 'function' && !isWorldActive(lorebook)) {
+                activateWorld(lorebook);
+                console.log(`[Dooms Tracker] Workshop: activated lorebook "${lorebook}" for inject`);
+            }
+        } catch (e) {
+            console.warn(`[Dooms Tracker] Workshop: failed to activate lorebook "${lorebook}"`, e);
+        }
+    }
+
+    // 4. One-shot prompt
+    const prompt = buildInjectPrompt(trimmed, { description, lorebook });
     try {
-        // Signature: setExtensionPrompt(key, value, position, depth, scan, role)
         setExtensionPrompt(
             INJECT_SLOT,
             prompt,
@@ -391,11 +470,15 @@ function injectIntoScene(name) {
         console.warn('[Dooms Tracker] Workshop: setExtensionPrompt failed', e);
     }
 
-    // 3. User feedback
+    // 5. User feedback
     try {
         if (window.toastr) {
+            const extras = [];
+            if (description) extras.push('description');
+            if (lorebook) extras.push(`lorebook "${lorebook}"`);
+            const tail = extras.length ? ` (with ${extras.join(' + ')})` : '';
             window.toastr.success(
-                `${trimmed} will be brought into the scene next turn.`,
+                `${trimmed} will be brought into the scene next turn${tail}.`,
                 'Character Injected',
                 { timeOut: 4000 },
             );
@@ -405,14 +488,22 @@ function injectIntoScene(name) {
     }
 }
 
-function buildInjectPrompt(name) {
-    return (
+function buildInjectPrompt(name, extras) {
+    const description = extras?.description || '';
+    const lorebook = extras?.lorebook || '';
+    let out =
         `[SCENE DIRECTION — INJECT CHARACTER]\n` +
         `Incorporate the character "${name}" into your next response. ` +
         `Have them arrive, reveal themselves, or otherwise become present in a way that fits the current scene naturally. ` +
-        `Include them in your presentCharacters tracker output for this turn. ` +
-        `This is a one-time direction from the user; do not mention these bracketed instructions in your reply.\n`
-    );
+        `Include them in your presentCharacters tracker output for this turn.`;
+    if (description) {
+        out += `\n\nCharacter notes for "${name}":\n${description}`;
+    }
+    if (lorebook) {
+        out += `\n\nThe lorebook "${lorebook}" has been activated for additional context about this character; consult its entries as relevant.`;
+    }
+    out += `\n\nThis is a one-time direction from the user; do not mention these bracketed instructions in your reply.\n`;
+    return out;
 }
 
 function clearInjectPromptIfPending() {

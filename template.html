@@ -1991,6 +1991,7 @@
                 <nav class="workshop-nav" aria-label="Section">
                     <button type="button" class="active" data-pane="identity">&#128481; Identity</button>
                     <button type="button" data-pane="appearance">&#127912; Appearance</button>
+                    <button type="button" data-pane="injection">&#128137; Injection</button>
                 </nav>
             </aside>
 
@@ -2034,6 +2035,28 @@
                         <h4>Dialogue color</h4>
                         <p class="helper">Used for this character's dialogue in chat and the name label on the portrait card.</p>
                         <div class="rpg-color-palette" id="cw-palette" role="radiogroup" aria-label="Dialogue color"></div>
+                    </div>
+                </section>
+
+                <!-- INJECTION -->
+                <section class="rpg-editor-pane" data-pane="injection">
+                    <div class="rpg-editor-section">
+                        <h4>Brief description</h4>
+                        <p class="helper">Optional context the AI sees when you click <strong>Inject into Scene</strong>. A few sentences about appearance, role, manner of speaking &mdash; whatever helps the AI portray them consistently.</p>
+                        <div class="rpg-field">
+                            <label for="cw-inj-description" class="sr-only">Brief description</label>
+                            <textarea id="cw-inj-description" class="rpg-textarea" rows="6" placeholder="e.g. A wiry archivist in his sixties, soft-spoken, always carrying a sealed scroll case&hellip;"></textarea>
+                        </div>
+                    </div>
+                    <div class="rpg-editor-section">
+                        <h4>Attached lorebook</h4>
+                        <p class="helper">Pick a SillyTavern lorebook (World Info) to activate when this character is injected. Leave blank to skip.</p>
+                        <div class="rpg-field">
+                            <label for="cw-inj-lorebook" class="sr-only">Attached lorebook</label>
+                            <select id="cw-inj-lorebook" class="rpg-input">
+                                <option value="">&mdash; None &mdash;</option>
+                            </select>
+                        </div>
                     </div>
                 </section>
 
