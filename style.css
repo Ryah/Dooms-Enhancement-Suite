@@ -20125,3 +20125,41 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.55; transform: scale(1.35); }
 }
+
+/* Character Roster scope-filter pills */
+#character-roster-popup .cr-scope-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0.5rem calc(var(--modal-padding) * 1.5);
+    background: rgba(0, 0, 0, 0.18);
+    border-bottom: 1px solid var(--rpg-border, #4a7ba7);
+    flex-shrink: 0;
+}
+#character-roster-popup .cr-scope-pill {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--rpg-border, #4a7ba7);
+    color: rgba(234, 234, 234, 0.75);
+    padding: 0.3rem 0.8rem;
+    font: inherit;
+    font-size: var(--modal-font-small, 0.8rem);
+    font-weight: 600;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+#character-roster-popup .cr-scope-pill:hover {
+    color: var(--rpg-text);
+    border-color: var(--rpg-highlight, #e94560);
+}
+#character-roster-popup .cr-scope-pill.is-active {
+    background: rgba(233, 69, 96, 0.18);
+    border-color: var(--rpg-highlight, #e94560);
+    color: var(--rpg-highlight, #e94560);
+}
+#character-roster-popup .cr-scope-pill:disabled,
+#character-roster-popup .cr-scope-pill.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}

@@ -31,6 +31,7 @@ const REL_EMOJI = {
 let $modal = null;
 let listenersBound = false;
 let searchQuery = '';
+let scope = 'all'; // 'all' | 'chat' | 'active'
 
 export function initCharacterRoster() {
     if (extensionSettings?.characterWorkshopEnabled === false) {
@@ -52,7 +53,12 @@ export function openCharacterRoster() {
         listenersBound = true;
     }
     searchQuery = '';
+    scope = 'all';
     $modal.find('#cr-search').val('');
+    $modal.find('.cr-scope-pill').each(function () {
+        const isActive = $(this).attr('data-scope') === 'all';
+        $(this).toggleClass('is-active', isActive).attr('aria-selected', isActive ? 'true' : 'false');
+    });
     renderGrid();
     // Apply the active DES theme so the theme-specific token overrides
     // take effect (matches trackerEditor / settings popup convention).
@@ -127,6 +133,18 @@ function bindListeners() {
     // Live search
     $modal.on('input.cr', '#cr-search', function () {
         searchQuery = ($(this).val() || '').toString().trim().toLowerCase();
+        renderGrid();
+    });
+
+    // Scope pills
+    $modal.on('click.cr', '.cr-scope-pill', function () {
+        const next = $(this).attr('data-scope') || 'all';
+        if (next === scope) return;
+        scope = next;
+        $modal.find('.cr-scope-pill').each(function () {
+            const isActive = $(this).attr('data-scope') === scope;
+            $(this).toggleClass('is-active', isActive).attr('aria-selected', isActive ? 'true' : 'false');
+        });
         renderGrid();
     });
 
@@ -212,19 +230,24 @@ function renderGrid() {
     const $grid = $modal.find('#cr-grid').empty();
     const $empty = $modal.find('#cr-empty');
 
-    // Active = currently in the chat's scene per the latest AI response.
-    // Case-insensitive set so namesMatch quirks don't drop matches.
-    let activeSet = new Set();
+    // Pull this-chat and active scopes once per render. Both come from
+    // getCharacterList(), which merges the current chat's present +
+    // absent characters.
+    const chatNames = new Set();   // all characters in this chat's panel
+    const activeSet = new Set();   // subset: currently in scene
     try {
         const list = getCharacterList() || [];
         for (const c of list) {
-            if (c?.present && c?.name) activeSet.add(c.name.toLowerCase());
+            if (!c?.name) continue;
+            const key = c.name.toLowerCase();
+            chatNames.add(key);
+            if (c.present) activeSet.add(key);
         }
     } catch (e) {
         console.warn('[Dooms Tracker] Roster: getCharacterList failed', e);
     }
 
-    // The "+ New Character" tile is always present regardless of search.
+    // The "+ New Character" tile is always present regardless of search/scope.
     $grid.append(
         `<button type="button" class="cr-tile cr-tile-new" role="listitem" aria-label="New character">
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
@@ -232,24 +255,38 @@ function renderGrid() {
         </button>`
     );
 
-    const names = collectCharacterNames().sort((a, b) => a.localeCompare(b));
+    const allNames = collectCharacterNames().sort((a, b) => a.localeCompare(b));
+    const scopeFiltered = allNames.filter(n => {
+        if (scope === 'chat') return chatNames.has(n.toLowerCase());
+        if (scope === 'active') return activeSet.has(n.toLowerCase());
+        return true;
+    });
     const filtered = searchQuery
-        ? names.filter(n => n.toLowerCase().includes(searchQuery))
-        : names;
+        ? scopeFiltered.filter(n => n.toLowerCase().includes(searchQuery))
+        : scopeFiltered;
 
     for (const name of filtered) {
         $grid.append(buildTile(name, activeSet.has(name.toLowerCase())));
     }
 
-    // Count badges — total + currently-active subset.
-    const total = names.length;
-    const activeCount = names.reduce((n, name) => n + (activeSet.has(name.toLowerCase()) ? 1 : 0), 0);
-    const activeTxt = activeCount > 0 ? ` · ${activeCount} active` : '';
-    $modal.find('#cr-count').text(`${total} ${total === 1 ? 'character' : 'characters'}${activeTxt}`);
+    // Count badge — total in current scope, plus active count when any.
+    const total = scopeFiltered.length;
+    const activeCount = scopeFiltered.reduce((n, name) => n + (activeSet.has(name.toLowerCase()) ? 1 : 0), 0);
+    const activeTxt = activeCount > 0 && scope !== 'active' ? ` · ${activeCount} active` : '';
+    const scopeTxt = scope === 'chat' ? ' in this chat' : scope === 'active' ? ' active' : '';
+    $modal.find('#cr-count').text(`${total} ${total === 1 ? 'character' : 'characters'}${scopeTxt}${activeTxt}`);
 
-    // Empty-results message (only when user has searched and filter produced nothing)
-    const noResults = searchQuery && filtered.length === 0;
+    // Empty state: triggered by either an empty scope or a zero-result search.
+    const noResults = filtered.length === 0;
     $empty.prop('hidden', !noResults);
+    if (noResults) {
+        const msg = scope === 'chat'
+            ? 'No characters in this chat yet.'
+            : scope === 'active'
+            ? 'No characters currently in the scene.'
+            : 'No characters match that search.';
+        $empty.find('p').text(msg);
+    }
 }
 
 function buildTile(name, isActive) {
