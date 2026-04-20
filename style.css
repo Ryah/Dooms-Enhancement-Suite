@@ -20177,6 +20177,7 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     width: calc(
         var(--dooms-pb-side-cols) * var(--dooms-pb-side-card-w)
         + (var(--dooms-pb-side-cols) - 1) * var(--dooms-pb-side-gap)
+        + var(--dooms-pb-side-cols) * 2px  /* 1px border on each side of each card */
         + var(--dooms-pb-side-pad) * 2
         + var(--dooms-pb-side-toggle-w)
     );
@@ -20288,11 +20289,12 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
 }
 #dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-scroll.dooms-pb-centered,
 #dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-scroll.dooms-pb-centered {
-    /* Center horizontally AND vertically. Without the align-content tweak
-       the cards would stack from the top of a tall side panel even with
-       only a couple of active characters. */
-    justify-content: center;
-    align-content: center;
+    /* In side mode the Alignment dropdown's two options become TOP / BOTTOM
+       (the JS label swap is in index.js). 'Inline (Left)' -> Top keeps the
+       default flex-start. 'Centered' -> Bottom anchors cards to the bottom
+       edge of the bar via align-content: flex-end. */
+    justify-content: flex-start;
+    align-content: flex-end;
 }
 /* Cards keep their existing --dooms-pb-card-w/h sizing — no overrides. */
 

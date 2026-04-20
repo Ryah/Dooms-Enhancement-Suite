@@ -410,6 +410,7 @@ async function initUI() {
         // Show side-only options only when a side mode is active.
         const isSide = $(this).val() === 'left' || $(this).val() === 'right';
         $('#rpg-pb-side-options').toggle(isSide);
+        relabelPortraitAlignmentOptions(isSide);
     });
     $('#rpg-pb-side-columns').on('change', function() {
         const cols = parseInt($(this).val(), 10);
@@ -417,6 +418,25 @@ async function initUI() {
         saveSettings();
         try { applySideModeStyling(); } catch (e) {}
     });
+
+    /**
+     * Contextual labels for the Alignment dropdown.
+     * Horizontal position (above / below / top): "Inline (Left)" / "Centered"
+     * Side position (left / right): "Top" / "Bottom"
+     * Underlying values stay 'left' / 'center' so settings persist across mode changes.
+     */
+    function relabelPortraitAlignmentOptions(isSide) {
+        const $left = $('#rpg-portrait-alignment option[value="left"]');
+        const $center = $('#rpg-portrait-alignment option[value="center"]');
+        if (isSide) {
+            $left.text('Top');
+            $center.text('Bottom');
+        } else {
+            $left.text('Inline (Left)');
+            $center.text('Centered');
+        }
+    }
+    window.__doomsRelabelAlignment = relabelPortraitAlignmentOptions;
 
     // ── Portrait Bar customization ──
     const _pbSettings = () => {
@@ -1468,6 +1488,8 @@ async function initUI() {
         const sideOpen = extensionSettings.portraitPosition === 'left' || extensionSettings.portraitPosition === 'right';
         $('#rpg-pb-side-options').toggle(sideOpen);
         try { applySideModeStyling(); } catch (e) {}
+        // Relabel the alignment dropdown so side mode shows Top/Bottom.
+        try { (window.__doomsRelabelAlignment || (()=>{}))(sideOpen); } catch (e) {}
     }
     // Portrait Bar customization
     const pb = extensionSettings.portraitBarSettings || {};
