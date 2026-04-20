@@ -305,6 +305,28 @@ function applyPreviewColor(hex) {
     $modal.find('#cw-preview-card-name').css('color', hex);
     $modal.find('#cw-preview-name').css('color', hex);
     $modal.find('#cw-preview-color-dot').css('background', hex);
+    // Keep the custom-color button's preview chip in sync too.
+    $modal.find('#cw-color-custom-preview').css('background', hex);
+    $modal.find('#cw-color-custom-input').val(hex);
+}
+
+/**
+ * Commit a new dialogue color to the draft and refresh all UI that
+ * shows it (palette selection state, preview card, custom button chip).
+ * Accepts any hex; if the color matches a palette swatch, that swatch
+ * gets the 'selected' highlight too.
+ */
+function commitColorSelection(hex) {
+    if (!draft || !hex) return;
+    const lower = String(hex).toLowerCase();
+    draft.color = lower;
+    draft.dirty.color = true;
+    $modal.find('.rpg-color-swatch').each(function () {
+        const match = ($(this).attr('data-hex') || '').toLowerCase() === lower;
+        $(this).toggleClass('selected', match);
+        $(this).attr('aria-checked', match ? 'true' : 'false');
+    });
+    applyPreviewColor(lower);
 }
 
 function activatePane(paneId) {
@@ -331,14 +353,23 @@ function bindStaticListeners() {
         if (!draft) return;
         const hex = $(this).attr('data-hex');
         if (!hex) return;
-        draft.color = hex;
-        draft.dirty.color = true;
-        $modal.find('.rpg-color-swatch').each(function () {
-            const selected = $(this).attr('data-hex') === hex;
-            $(this).toggleClass('selected', selected);
-            $(this).attr('aria-checked', selected ? 'true' : 'false');
-        });
-        applyPreviewColor(hex);
+        commitColorSelection(hex);
+    });
+
+    // Custom-color dropper — opens the native color picker sheet.
+    $modal.on('click.cw', '#cw-color-custom-btn', function (e) {
+        e.preventDefault();
+        const $input = $modal.find('#cw-color-custom-input');
+        if (!$input.length) return;
+        // Seed the picker with the draft's current color so it opens on it.
+        if (draft?.color) $input.val(draft.color);
+        $input[0].click();
+    });
+    $modal.on('input.cw change.cw', '#cw-color-custom-input', function () {
+        if (!draft) return;
+        const hex = String($(this).val() || '').toLowerCase();
+        if (!/^#[0-9a-f]{6}$/.test(hex)) return;
+        commitColorSelection(hex);
     });
 
     $modal.on('change.cw', '#cw-portrait-file', function () {

@@ -2051,8 +2051,15 @@
                     </div>
                     <div class="rpg-editor-section">
                         <h4>Dialogue color</h4>
-                        <p class="helper">Used for this character's dialogue in chat and the name label on the portrait card.</p>
+                        <p class="helper">Used for this character's dialogue in chat and the name label on the portrait card. Pick from the palette or click <strong>Custom&hellip;</strong> for a precise color.</p>
                         <div class="rpg-color-palette" id="cw-palette" role="radiogroup" aria-label="Dialogue color"></div>
+                        <div class="stack" style="max-width: 320px; margin-top: 0.6rem;">
+                            <button type="button" class="rpg-btn" id="cw-color-custom-btn">
+                                <i class="fa-solid fa-eye-dropper"></i> Custom&hellip;
+                                <span class="cw-color-custom-preview" id="cw-color-custom-preview" aria-hidden="true"></span>
+                            </button>
+                            <input type="color" id="cw-color-custom-input" class="sr-only" value="#e94560" aria-label="Custom dialogue color">
+                        </div>
                     </div>
                     <div class="rpg-editor-section">
                         <h4>Expressions</h4>

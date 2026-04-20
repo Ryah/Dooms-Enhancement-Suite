@@ -154,9 +154,6 @@ export function initPortraitBar() {
                 <div class="dooms-pb-header">
                     <span class="dooms-pb-title"><i class="fa-solid fa-users"></i> Present Characters</span>
                     <span class="dooms-pb-count" id="dooms-pb-count">0 characters</span>
-                    <button class="dooms-pb-restore-btn" id="dooms-pb-restore-btn" title="Restore removed characters" style="display:none;">
-                        <i class="fa-solid fa-user-plus"></i>
-                    </button>
                     <button class="dooms-pb-restore-btn dooms-pb-roster-btn" id="dooms-pb-open-roster" title="Open Character Roster" type="button">
                         <i class="fa-solid fa-users-rectangle"></i>
                     </button>
@@ -368,58 +365,6 @@ export function initPortraitBar() {
         $('#dooms-pb-open-roster').hide();
     }
 
-    // ── Restore removed characters button ──
-    $('#dooms-pb-restore-btn').on('click', function (e) {
-        e.stopPropagation();
-        const removed = getActiveRemovedCharacters();
-        if (removed.length === 0) return;
-
-        // Build a simple popup list
-        const listHtml = removed.map(name =>
-            `<div class="dooms-pb-restore-item" data-name="${escapeHtml(name)}">
-                <span>${escapeHtml(name)}</span>
-                <button class="dooms-pb-restore-item-btn" title="Restore"><i class="fa-solid fa-rotate-left"></i></button>
-            </div>`
-        ).join('');
-        const $popup = $(`<div class="dooms-pb-restore-popup">
-            <div class="dooms-pb-restore-header">Removed Characters</div>
-            ${listHtml}
-            <div class="dooms-pb-restore-footer">
-                <button class="dooms-pb-restore-all-btn">Restore All</button>
-            </div>
-        </div>`);
-
-        // Position near the button
-        const btnOffset = $(this).offset();
-        $popup.css({ top: btnOffset.top + 28, left: btnOffset.left - 100 });
-        $('body').append($popup);
-
-        // Restore single
-        $popup.on('click', '.dooms-pb-restore-item-btn', function () {
-            const name = $(this).closest('.dooms-pb-restore-item').data('name');
-            restoreCharacter(name);
-            $(this).closest('.dooms-pb-restore-item').fadeOut(200, function () { $(this).remove(); });
-            if ($popup.find('.dooms-pb-restore-item').length <= 1) {
-                $popup.remove();
-            }
-        });
-
-        // Restore all
-        $popup.on('click', '.dooms-pb-restore-all-btn', function () {
-            const removedList = getActiveRemovedCharacters();
-            removedList.length = 0; // Clear in-place so the reference stays valid
-            saveCharacterRosterChange();
-            $popup.remove();
-            updatePortraitBar();
-            console.log('[Dooms Portrait Bar] All removed characters restored');
-        });
-
-        // Dismiss on outside click
-        setTimeout(() => {
-            $(document).one('click.dooms-pb-restore', function () { $popup.remove(); });
-        }, 0);
-    });
-
     // Initial render
     updatePortraitBar();
 }
@@ -457,11 +402,6 @@ export function updatePortraitBar() {
         ? `${totalCount} ${totalCount === 1 ? 'character' : 'characters'}`
         : `${presentCount} present / ${totalCount} known`;
     $('#dooms-pb-count').text(countText);
-
-    // Show/hide restore button based on whether there are removed characters
-    const removedCount = getActiveRemovedCharacters().length;
-    $('#dooms-pb-restore-btn').toggle(removedCount > 0)
-        .attr('title', `Restore removed characters (${removedCount})`);
 
     if (totalCount === 0) {
         $scroll.html('<div class="dooms-pb-empty">No characters present</div>');
@@ -994,30 +934,9 @@ function clearCharacterColor(characterName) {
 }
 
 /**
- * Removes a character from the known-characters roster (and their portrait if any).
+ * Removes a character from the current chat's Present Characters panel
+ * (soft remove — keeps their Workshop/Roster data intact).
  */
-function restoreCharacter(characterName) {
-    const removedList = getActiveRemovedCharacters();
-    if (removedList.length === 0) return;
-    const lowerName = characterName.toLowerCase();
-    // Remove in-place so the accessor's returned reference stays valid
-    // regardless of whether it points to per-chat or global storage.
-    for (let i = removedList.length - 1; i >= 0; i--) {
-        if (removedList[i].toLowerCase() === lowerName) {
-            removedList.splice(i, 1);
-        }
-    }
-    // Clear the no-portrait cache so file probing can resume
-    portraitFileCache.delete(characterName);
-    try {
-        const noPortrait = JSON.parse(localStorage.getItem('dooms-portrait-no-file') || '[]');
-        localStorage.setItem('dooms-portrait-no-file', JSON.stringify(noPortrait.filter(n => n !== characterName)));
-    } catch (e) { /* ignore */ }
-    saveCharacterRosterChange();
-    updatePortraitBar();
-    console.log(`[Dooms Portrait Bar] Character restored: ${characterName}`);
-}
-
 function removeCharacter(characterName) {
     // Soft-remove: hide from the current chat's Present Characters panel
     // by adding to the removedCharacters blacklist. Preserves the
