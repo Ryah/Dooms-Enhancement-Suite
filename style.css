@@ -20489,3 +20489,35 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
 #character-roster-popup .cr-tile-pinned .cr-tile-dot {
     top: 34px;
 }
+
+/* ============================================================================
+   Side-mode panel height options.
+   .dooms-pb-side-height-full (default before cw-53): wrapper stretches from
+       top of chat to bottom — feels wasteful with only a couple of cards.
+   .dooms-pb-side-height-auto: wrapper shrinks to fit its content and sits
+       vertically centered in the viewport. Caps at viewport height so
+       a big roster still scrolls within the bar.
+   ============================================================================ */
+
+/* Auto-height: fit content, vertically center, capped at viewport */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left.dooms-pb-side-height-auto,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right.dooms-pb-side-height-auto {
+    top: 50%;
+    transform: translateY(-50%);
+    bottom: auto;
+    height: auto;
+    max-height: calc(100vh - var(--topBarBlockSize, 40px) - 20px);
+    border-radius: 0 6px 6px 0;
+}
+#dooms-portrait-bar-wrapper.dooms-pb-position-right.dooms-pb-side-height-auto {
+    border-radius: 6px 0 0 6px;
+}
+/* When height is auto the inner scroll container shouldn't force a
+   full-height layout with space-between — let it hug the cards. */
+#dooms-portrait-bar-wrapper.dooms-pb-side-height-auto .dooms-pb-scroll {
+    flex: 0 1 auto;
+}
+
+/* Explicit full-height class is a no-op structurally (matches the base
+   fixed top+bottom the wrapper already has), but the class exists so JS
+   can toggle it deterministically without race conditions. */

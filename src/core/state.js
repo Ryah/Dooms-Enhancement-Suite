@@ -254,6 +254,7 @@ export let extensionSettings = {
     portraitAlignment: 'left', // Portrait bar alignment: 'left' (inline) or 'center'
     portraitPosition: 'above', // Portrait bar position: 'above', 'below', 'top', 'left', or 'right'
     portraitSideColumns: 1,     // Side mode: number of card columns (1 or 2)
+    portraitSideHeight: 'auto', // Side mode: 'auto' (fit content, vertical-center) or 'full' (top to bottom)
     portraitBarSettings: {
         cardWidth: 110,              // Portrait card width in px
         cardHeight: 150,             // Portrait card height in px

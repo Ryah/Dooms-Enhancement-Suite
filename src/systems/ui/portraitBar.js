@@ -605,6 +605,13 @@ export function applySideModeStyling() {
     const safeCols = cols < 1 ? 1 : cols > 2 ? 2 : cols;
     document.documentElement.style.setProperty('--dooms-pb-side-cols', safeCols);
     $wrapper.css('--dooms-pb-side-cols', safeCols);
+
+    // Panel height mode: 'auto' fits to content + vertically centers;
+    // 'full' stretches top to bottom (the original cw-33 behavior).
+    const heightMode = extensionSettings.portraitSideHeight === 'full' ? 'full' : 'auto';
+    $wrapper
+        .toggleClass('dooms-pb-side-height-auto', heightMode === 'auto')
+        .toggleClass('dooms-pb-side-height-full', heightMode === 'full');
 }
 
 // ─────────────────────────────────────────────

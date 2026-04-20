@@ -418,6 +418,12 @@ async function initUI() {
         saveSettings();
         try { applySideModeStyling(); } catch (e) {}
     });
+    $('#rpg-pb-side-height').on('change', function() {
+        const val = $(this).val();
+        extensionSettings.portraitSideHeight = (val === 'full') ? 'full' : 'auto';
+        saveSettings();
+        try { applySideModeStyling(); } catch (e) {}
+    });
 
     /**
      * Contextual labels for the Alignment dropdown.
@@ -1484,6 +1490,7 @@ async function initUI() {
     $('#rpg-portrait-position').val(extensionSettings.portraitPosition || 'above');
     // Side-mode subordinate settings
     $('#rpg-pb-side-columns').val(String(extensionSettings.portraitSideColumns || 1));
+    $('#rpg-pb-side-height').val(extensionSettings.portraitSideHeight === 'full' ? 'full' : 'auto');
     {
         const sideOpen = extensionSettings.portraitPosition === 'left' || extensionSettings.portraitPosition === 'right';
         $('#rpg-pb-side-options').toggle(sideOpen);

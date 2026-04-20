@@ -356,6 +356,16 @@ export function loadSettings() {
                 extensionSettings.settingsVersion = 19;
                 settingsChanged = true;
             }
+            // Migration to version 20: Initialize portraitSideHeight
+            // ('auto' = fit content and vertically center, 'full' = top to
+            // bottom like earlier side-mode behavior).
+            if (currentVersion < 20) {
+                if (extensionSettings.portraitSideHeight !== 'full') {
+                    extensionSettings.portraitSideHeight = 'auto';
+                }
+                extensionSettings.settingsVersion = 20;
+                settingsChanged = true;
+            }
 
             // Save migrated settings
             if (settingsChanged) {
