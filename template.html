@@ -2182,6 +2182,20 @@
                 <i class="fa-solid fa-trash" aria-hidden="true"></i> Delete character
             </li>
         </ul>
+
+        <!-- Inline "+ New Character" dialog -->
+        <div class="cr-newchar-overlay" id="cr-newchar-overlay" hidden role="dialog" aria-modal="true" aria-label="New character">
+            <div class="cr-newchar-card">
+                <h4>New character</h4>
+                <p class="helper">Name this character. You can edit everything else in the Workshop.</p>
+                <input id="cr-newchar-input" class="rpg-input" type="text" placeholder="e.g. Aria Vex" autocomplete="off" maxlength="120">
+                <div class="cr-newchar-error" id="cr-newchar-error" hidden></div>
+                <div class="cr-newchar-actions">
+                    <button type="button" class="rpg-btn rpg-btn-ghost" id="cr-newchar-cancel">Cancel</button>
+                    <button type="button" class="rpg-btn rpg-btn-primary" id="cr-newchar-create">Create</button>
+                </div>
+            </div>
+        </div>
     </section>
 </div>
 

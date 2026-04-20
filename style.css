@@ -20410,3 +20410,55 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
         pointer-events: none;
     }
 }
+
+/* Character Roster — inline "+ New Character" dialog */
+#character-roster-popup .cr-newchar-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10020;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+#character-roster-popup .cr-newchar-overlay[hidden] { display: none; }
+#character-roster-popup .cr-newchar-card {
+    width: min(360px, 90%);
+    background: var(--rpg-bg, rgba(30, 30, 30, 0.98));
+    border: 1px solid var(--rpg-border, #4a7ba7);
+    border-radius: 0.4rem;
+    padding: 1rem 1.1rem 1rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+}
+#character-roster-popup .cr-newchar-card h4 {
+    margin: 0 0 0.35rem;
+    color: var(--rpg-highlight, #e94560);
+    font-size: var(--modal-font-heading, 1rem);
+    font-weight: 700;
+}
+#character-roster-popup .cr-newchar-card .helper {
+    margin: 0 0 0.7rem;
+    color: rgba(234, 234, 234, 0.7);
+    font-size: var(--modal-font-small, 0.8rem);
+    line-height: 1.4;
+}
+#character-roster-popup .cr-newchar-card .rpg-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 0.7rem;
+    font-size: var(--modal-font-base, 0.9rem);
+}
+#character-roster-popup .cr-newchar-error {
+    margin-top: 0.4rem;
+    color: #ff9090;
+    font-size: var(--modal-font-small, 0.8rem);
+}
+#character-roster-popup .cr-newchar-error[hidden] { display: none; }
+#character-roster-popup .cr-newchar-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.9rem;
+}

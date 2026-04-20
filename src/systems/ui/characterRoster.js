@@ -96,6 +96,11 @@ function bindListeners() {
     // Esc key while modal is open
     $(document).on('keydown.cr', (e) => {
         if (e.key !== 'Escape') return;
+        // If the new-character dialog is open, Esc only closes that.
+        if (!$modal.find('#cr-newchar-overlay').prop('hidden')) {
+            closeNewCharacterDialog();
+            return;
+        }
         // If the context menu is open, Esc only closes that.
         if (!$modal.find('#cr-context-menu').prop('hidden')) {
             hideContextMenu();
@@ -163,18 +168,55 @@ function bindListeners() {
 
     // "+ New Character" tile
     $modal.on('click.cr', '.cr-tile-new', () => handleNewCharacter());
+
+    // Inline new-character dialog
+    $modal.on('click.cr', '#cr-newchar-cancel', () => closeNewCharacterDialog());
+    $modal.on('click.cr', '#cr-newchar-create', () => commitNewCharacter());
+    $modal.on('keydown.cr', '#cr-newchar-input', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); commitNewCharacter(); }
+        else if (e.key === 'Escape') { e.stopPropagation(); closeNewCharacterDialog(); }
+    });
+    // Backdrop click closes the inline dialog (but not the roster itself).
+    $modal.on('click.cr', '#cr-newchar-overlay', function (e) {
+        if (e.target === this) closeNewCharacterDialog();
+    });
 }
 
 function handleNewCharacter() {
-    const name = window.prompt('New character name:');
-    if (!name) return;
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    // Reject duplicates (case-insensitive) so we don't shadow an existing one.
+    // Open the inline dialog. Actual creation happens in
+    // commitNewCharacter() wired to the Create button / Enter key.
+    const $dialog = $modal.find('#cr-newchar-overlay');
+    const $input = $modal.find('#cr-newchar-input');
+    const $error = $modal.find('#cr-newchar-error');
+    if (!$dialog.length) {
+        console.warn('[Dooms Tracker] Roster: #cr-newchar-overlay not in DOM');
+        return;
+    }
+    $input.val('');
+    $error.prop('hidden', true).text('');
+    $dialog.prop('hidden', false);
+    // Defer focus so the dialog is visible first on slow mobile browsers.
+    setTimeout(() => $input.trigger('focus'), 0);
+}
+
+function closeNewCharacterDialog() {
+    const $dialog = $modal?.find('#cr-newchar-overlay');
+    if ($dialog && $dialog.length) $dialog.prop('hidden', true);
+}
+
+function commitNewCharacter() {
+    const $input = $modal.find('#cr-newchar-input');
+    const $error = $modal.find('#cr-newchar-error');
+    const raw = String($input.val() || '');
+    const trimmed = raw.trim();
+    if (!trimmed) {
+        $error.prop('hidden', false).text('Name is required.');
+        return;
+    }
     const existing = collectCharacterNames();
     const clash = existing.find(n => n.toLowerCase() === trimmed.toLowerCase());
     if (clash) {
-        window.alert(`A character named "${clash}" already exists.`);
+        $error.prop('hidden', false).text(`A character named "${clash}" already exists.`);
         return;
     }
     if (!extensionSettings.knownCharacters) extensionSettings.knownCharacters = {};
@@ -186,6 +228,7 @@ function handleNewCharacter() {
     } catch (e) {
         console.warn('[Dooms Tracker] Roster: failed to refresh portrait bar after new character', e);
     }
+    closeNewCharacterDialog();
     closeCharacterRoster();
     setTimeout(() => {
         window.dispatchEvent(new CustomEvent('dooms:open-workshop', { detail: { characterName: trimmed } }));
