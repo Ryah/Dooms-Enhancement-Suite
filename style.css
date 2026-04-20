@@ -20077,3 +20077,51 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     background: rgba(214, 48, 49, 0.15);
     color: #ffb4b4;
 }
+
+/* Active-in-scene indicator on Character Roster tiles */
+#character-roster-popup .cr-tile-active {
+    border-color: rgba(46, 204, 113, 0.55);
+    box-shadow: 0 0 0 1px rgba(46, 204, 113, 0.35), 0 6px 14px rgba(46, 204, 113, 0.18);
+}
+#character-roster-popup .cr-tile-active:hover,
+#character-roster-popup .cr-tile-active:focus-visible {
+    border-color: rgba(46, 204, 113, 0.9);
+    box-shadow: 0 6px 18px rgba(46, 204, 113, 0.32);
+}
+
+#character-roster-popup .cr-tile-active-badge {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(46, 204, 113, 0.7);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #8ffac2;
+    text-transform: uppercase;
+    line-height: 1;
+    pointer-events: none;
+}
+#character-roster-popup .cr-tile-active-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #2ecc71;
+    box-shadow: 0 0 6px rgba(46, 204, 113, 0.8);
+    animation: cr-active-pulse 1.6s ease-in-out infinite;
+}
+#character-roster-popup .cr-tile-active-label { line-height: 1; }
+
+@keyframes cr-active-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(1.35); }
+}

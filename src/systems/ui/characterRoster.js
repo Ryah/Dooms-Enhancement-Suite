@@ -16,7 +16,7 @@
 
 import { extensionSettings } from '../../core/state.js';
 import { saveSettings } from '../../core/persistence.js';
-import { clearPortraitCache, updatePortraitBar } from './portraitBar.js';
+import { clearPortraitCache, updatePortraitBar, getCharacterList } from './portraitBar.js';
 
 let contextMenuTarget = ''; // character name currently under right-click
 
@@ -212,6 +212,18 @@ function renderGrid() {
     const $grid = $modal.find('#cr-grid').empty();
     const $empty = $modal.find('#cr-empty');
 
+    // Active = currently in the chat's scene per the latest AI response.
+    // Case-insensitive set so namesMatch quirks don't drop matches.
+    let activeSet = new Set();
+    try {
+        const list = getCharacterList() || [];
+        for (const c of list) {
+            if (c?.present && c?.name) activeSet.add(c.name.toLowerCase());
+        }
+    } catch (e) {
+        console.warn('[Dooms Tracker] Roster: getCharacterList failed', e);
+    }
+
     // The "+ New Character" tile is always present regardless of search.
     $grid.append(
         `<button type="button" class="cr-tile cr-tile-new" role="listitem" aria-label="New character">
@@ -226,25 +238,28 @@ function renderGrid() {
         : names;
 
     for (const name of filtered) {
-        $grid.append(buildTile(name));
+        $grid.append(buildTile(name, activeSet.has(name.toLowerCase())));
     }
 
-    // Count badge — shows total roster size regardless of filter.
+    // Count badges — total + currently-active subset.
     const total = names.length;
-    $modal.find('#cr-count').text(`${total} ${total === 1 ? 'character' : 'characters'}`);
+    const activeCount = names.reduce((n, name) => n + (activeSet.has(name.toLowerCase()) ? 1 : 0), 0);
+    const activeTxt = activeCount > 0 ? ` · ${activeCount} active` : '';
+    $modal.find('#cr-count').text(`${total} ${total === 1 ? 'character' : 'characters'}${activeTxt}`);
 
     // Empty-results message (only when user has searched and filter produced nothing)
     const noResults = searchQuery && filtered.length === 0;
     $empty.prop('hidden', !noResults);
 }
 
-function buildTile(name) {
+function buildTile(name, isActive) {
     const avatar = extensionSettings?.npcAvatars?.[name] || '';
     const color = extensionSettings?.characterColors?.[name] || '';
     const relEmoji = resolveRelationshipEmoji(name);
     const safeName = escapeHtml(name);
     const safeNameAttr = escapeAttr(name);
-    const safeLabel = escapeAttr(`Open ${name} in Workshop`);
+    const activeSuffix = isActive ? ' (active in chat)' : '';
+    const safeLabel = escapeAttr(`Open ${name} in Workshop${activeSuffix}`);
     const imgHtml = avatar
         ? `<img src="${escapeAttr(avatar)}" alt="">`
         : `<div class="cr-placeholder" aria-hidden="true">&#128100;</div>`;
@@ -254,11 +269,19 @@ function buildTile(name) {
     const relHtml = relEmoji
         ? `<span class="cr-tile-rel" aria-hidden="true">${relEmoji}</span>`
         : '';
+    const activeBadge = isActive
+        ? `<span class="cr-tile-active-badge" title="Currently in scene">
+                <span class="cr-tile-active-dot"></span>
+                <span class="cr-tile-active-label">ACTIVE</span>
+            </span>`
+        : '';
+    const activeClass = isActive ? ' cr-tile-active' : '';
     return (
-        `<button type="button" class="cr-tile" role="listitem" data-character="${safeNameAttr}" aria-label="${safeLabel}">
+        `<button type="button" class="cr-tile${activeClass}" role="listitem" data-character="${safeNameAttr}" aria-label="${safeLabel}">
             ${imgHtml}
             ${relHtml}
             ${dotHtml}
+            ${activeBadge}
             <span class="cr-tile-name">${safeName}</span>
         </button>`
     );
