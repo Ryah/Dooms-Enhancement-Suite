@@ -246,8 +246,6 @@ export function initPortraitBar() {
             // and rotate the chevron to point toward the open direction.
             $wrapper.addClass('dooms-pb-collapsed-side');
         }
-        // Side-mode push-aside margin needs to follow collapsed state too.
-        try { applySideModeStyling(); } catch (e) {}
     });
 
     // ── Scroll arrows ──
@@ -566,9 +564,6 @@ export function repositionPortraitBar() {
 
     // Reset all position-mode classes; re-apply the active one below.
     $wrapper.removeClass('dooms-pb-position-top dooms-pb-position-left dooms-pb-position-right');
-    // Side modes also drive a chat margin via body class — clear here so
-    // switching back to a non-side mode releases the chat.
-    $('body').removeClass('dooms-pb-side-push-left dooms-pb-side-push-right');
 
     if (pos === 'left' || pos === 'right') {
         $('body').append($wrapper);
@@ -605,24 +600,11 @@ export function applySideModeStyling() {
     if (!$wrapper.length) return;
 
     // Always update the column var so it tracks even if mode flips back.
-    // Set on :root so both the panel wrapper AND the body.dooms-pb-side-push-*
-    // rules (which translate #sheld) can read it — a wrapper-scoped var
-    // would only reach the panel, not the chat container, causing the
-    // push calc to fall back to 1 column regardless of the actual setting.
     const cols = Number(extensionSettings.portraitSideColumns) || 1;
     // Clamp to 1-2; 3+ saved from earlier builds gets pulled back to 2.
     const safeCols = cols < 1 ? 1 : cols > 2 ? 2 : cols;
     document.documentElement.style.setProperty('--dooms-pb-side-cols', safeCols);
     $wrapper.css('--dooms-pb-side-cols', safeCols);
-
-    $('body').removeClass('dooms-pb-side-push-left dooms-pb-side-push-right dooms-pb-side-push-collapsed');
-    if ((pos === 'left' || pos === 'right') && extensionSettings.portraitSidePush === true) {
-        $('body').addClass(`dooms-pb-side-push-${pos}`);
-        // When collapsed, signal the body so it can use the narrower margin.
-        if ($wrapper.hasClass('dooms-pb-collapsed-side')) {
-            $('body').addClass('dooms-pb-side-push-collapsed');
-        }
-    }
 }
 
 // ─────────────────────────────────────────────

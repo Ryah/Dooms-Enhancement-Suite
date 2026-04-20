@@ -20334,30 +20334,10 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
    and SillyTavern's message column is width-percentage based so it
    would look cramped. transform: translateX moves the whole container
    over by the panel width while the chat keeps its natural layout.
-   overflow-x: hidden on body suppresses the horizontal scrollbar that
-   the translated element would otherwise create on its trailing edge. */
-body.dooms-pb-side-push-left,
-body.dooms-pb-side-push-right {
-    overflow-x: hidden;
-}
-body.dooms-pb-side-push-left #sheld {
-    transform: translateX(calc(
-        var(--dooms-pb-side-cols, 1) * var(--dooms-pb-card-w, 110px)
-        + (var(--dooms-pb-side-cols, 1) - 1) * 8px
-        + 20px
-        + var(--dooms-pb-side-toggle-w, 22px)
-    ));
-    transition: transform 0.2s ease;
-}
-body.dooms-pb-side-push-right #sheld {
-    transform: translateX(calc(-1 * (
-        var(--dooms-pb-side-cols, 1) * var(--dooms-pb-card-w, 110px)
-        + (var(--dooms-pb-side-cols, 1) - 1) * 8px
-        + 20px
-        + var(--dooms-pb-side-toggle-w, 22px)
-    )));
-    transition: transform 0.2s ease;
-}
+   NOTE: push-aside mode removed in cw-41 — the translate was stacking
+   on top of SillyTavern's own #sheld positioning and pushing the chat
+   way past the panel. Side mode now always floats over the chat; users
+   collapse the panel via its toggle handle to free up space. */
 
 /* Right mode bar order — keep toggle on the chat-facing edge. */
 #dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-portrait-bar { order: 1; }
@@ -20366,11 +20346,4 @@ body.dooms-pb-side-push-right #sheld {
 #dooms-portrait-bar-wrapper.dooms-pb-position-left.dooms-pb-collapsed-side,
 #dooms-portrait-bar-wrapper.dooms-pb-position-right.dooms-pb-collapsed-side {
     width: var(--dooms-pb-side-toggle-w, 22px);
-}
-/* Collapsed: shrink the translate to just the toggle-handle width. */
-body.dooms-pb-side-push-left.dooms-pb-side-push-collapsed #sheld {
-    transform: translateX(var(--dooms-pb-side-toggle-w, 22px));
-}
-body.dooms-pb-side-push-right.dooms-pb-side-push-collapsed #sheld {
-    transform: translateX(calc(-1 * var(--dooms-pb-side-toggle-w, 22px)));
 }

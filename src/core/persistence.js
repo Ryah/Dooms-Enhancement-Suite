@@ -336,11 +336,11 @@ export function loadSettings() {
                 extensionSettings.settingsVersion = 17;
                 settingsChanged = true;
             }
-            // Migration to version 18: Initialize side-mode portrait-bar settings
+            // Migration to version 18: Initialize side-mode portrait-bar
+            // column count. portraitSidePush was seeded here in an earlier
+            // build and then removed in cw-41 — the property lingers as
+            // harmless junk in old saves.
             if (currentVersion < 18) {
-                if (extensionSettings.portraitSidePush === undefined) {
-                    extensionSettings.portraitSidePush = false;
-                }
                 if (extensionSettings.portraitSideColumns === undefined) {
                     extensionSettings.portraitSideColumns = 1;
                 }

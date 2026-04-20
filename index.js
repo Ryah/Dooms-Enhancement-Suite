@@ -411,11 +411,6 @@ async function initUI() {
         const isSide = $(this).val() === 'left' || $(this).val() === 'right';
         $('#rpg-pb-side-options').toggle(isSide);
     });
-    $('#rpg-pb-side-push').on('change', function() {
-        extensionSettings.portraitSidePush = $(this).prop('checked');
-        saveSettings();
-        try { applySideModeStyling(); } catch (e) {}
-    });
     $('#rpg-pb-side-columns').on('change', function() {
         const cols = parseInt($(this).val(), 10);
         extensionSettings.portraitSideColumns = (cols >= 1 && cols <= 2) ? cols : 1;
@@ -1468,7 +1463,6 @@ async function initUI() {
     $('#rpg-portrait-alignment').val(extensionSettings.portraitAlignment || 'left');
     $('#rpg-portrait-position').val(extensionSettings.portraitPosition || 'above');
     // Side-mode subordinate settings
-    $('#rpg-pb-side-push').prop('checked', extensionSettings.portraitSidePush === true);
     $('#rpg-pb-side-columns').val(String(extensionSettings.portraitSideColumns || 1));
     {
         const sideOpen = extensionSettings.portraitPosition === 'left' || extensionSettings.portraitPosition === 'right';
