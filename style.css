@@ -20462,3 +20462,30 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     gap: 0.5rem;
     margin-top: 0.9rem;
 }
+
+/* Character Roster — pin badge + pinned-tile accent */
+#character-roster-popup .cr-tile-pin {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid var(--rpg-highlight, #e94560);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    color: var(--rpg-highlight, #e94560);
+    transform: rotate(45deg);
+    pointer-events: none;
+    z-index: 3;
+}
+/* If the character has a dialogue-color dot, stack the pin ABOVE it
+   so the two don't collide in the top-right corner. */
+#character-roster-popup .cr-tile-pinned .cr-tile-dot {
+    top: 34px;
+}

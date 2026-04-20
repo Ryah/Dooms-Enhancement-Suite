@@ -347,6 +347,15 @@ export function loadSettings() {
                 extensionSettings.settingsVersion = 18;
                 settingsChanged = true;
             }
+            // Migration to version 19: Initialize pinnedCharacters list
+            // (global pin-to-top state for the Character Roster).
+            if (currentVersion < 19) {
+                if (!Array.isArray(extensionSettings.pinnedCharacters)) {
+                    extensionSettings.pinnedCharacters = [];
+                }
+                extensionSettings.settingsVersion = 19;
+                settingsChanged = true;
+            }
 
             // Save migrated settings
             if (settingsChanged) {

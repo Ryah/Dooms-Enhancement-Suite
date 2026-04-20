@@ -33,6 +33,25 @@ let listenersBound = false;
 let searchQuery = '';
 let scope = 'all'; // 'all' | 'chat' | 'active'
 
+function isPinned(name) {
+    const list = extensionSettings?.pinnedCharacters;
+    if (!Array.isArray(list) || !name) return false;
+    const lower = name.toLowerCase();
+    return list.some(n => typeof n === 'string' && n.toLowerCase() === lower);
+}
+function togglePin(name) {
+    if (!name) return;
+    if (!Array.isArray(extensionSettings.pinnedCharacters)) {
+        extensionSettings.pinnedCharacters = [];
+    }
+    const list = extensionSettings.pinnedCharacters;
+    const lower = name.toLowerCase();
+    const idx = list.findIndex(n => typeof n === 'string' && n.toLowerCase() === lower);
+    if (idx >= 0) list.splice(idx, 1);
+    else list.push(name);
+    saveSettings();
+}
+
 export function initCharacterRoster() {
     // Roster is part of the Present Characters Panel feature set; when
     // PCP is off there's nothing to roster.
@@ -132,6 +151,9 @@ function bindListeners() {
             setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('dooms:open-workshop', { detail: { characterName: name } }));
             }, 220);
+        } else if (action === 'pin') {
+            togglePin(name);
+            renderGrid();
         } else if (action === 'delete') {
             confirmAndDelete(name);
         }
@@ -300,7 +322,14 @@ function renderGrid() {
         </button>`
     );
 
-    const allNames = collectCharacterNames().sort((a, b) => a.localeCompare(b));
+    const allNames = collectCharacterNames().sort((a, b) => {
+        // Pinned first (alphabetical among themselves), then unpinned
+        // (also alphabetical). Pin state is case-insensitive.
+        const pa = isPinned(a), pb = isPinned(b);
+        if (pa && !pb) return -1;
+        if (!pa && pb) return 1;
+        return a.localeCompare(b);
+    });
     const scopeFiltered = allNames.filter(n => {
         if (scope === 'chat') return chatNames.has(n.toLowerCase());
         if (scope === 'active') return activeSet.has(n.toLowerCase());
@@ -357,12 +386,17 @@ function buildTile(name, isActive) {
                 <span class="cr-tile-active-label">ACTIVE</span>
             </span>`
         : '';
-    const activeClass = isActive ? ' cr-tile-active' : '';
+    const pinned = isPinned(name);
+    const pinBadge = pinned
+        ? `<span class="cr-tile-pin" title="Pinned"><i class="fa-solid fa-thumbtack" aria-hidden="true"></i></span>`
+        : '';
+    const activeClass = (isActive ? ' cr-tile-active' : '') + (pinned ? ' cr-tile-pinned' : '');
     return (
         `<button type="button" class="cr-tile${activeClass}" role="listitem" data-character="${safeNameAttr}" aria-label="${safeLabel}">
             ${imgHtml}
             ${relHtml}
             ${dotHtml}
+            ${pinBadge}
             ${activeBadge}
             <span class="cr-tile-name">${safeName}</span>
         </button>`
@@ -379,6 +413,12 @@ function escapeHtml(s) {
 function showContextMenu(x, y) {
     const $menu = $modal.find('#cr-context-menu');
     if (!$menu.length) return;
+    // Update the Pin menu label based on the currently-targeted character.
+    const pinned = contextMenuTarget && isPinned(contextMenuTarget);
+    $menu.find('.cr-context-pin-label').text(pinned ? 'Unpin' : 'Pin to top');
+    $menu.find('[data-action="pin"] i')
+        .toggleClass('fa-thumbtack', true)
+        .css('transform', pinned ? 'rotate(45deg)' : '');
     $menu.css({ visibility: 'hidden' }).prop('hidden', false);
     // Clamp to viewport so the menu doesn't spill off the screen.
     const menuW = $menu.outerWidth() || 180;
@@ -428,5 +468,13 @@ function purgeCharacter(name) {
     if (s.knownCharacters) delete s.knownCharacters[name];
     if (s.heroPositions) delete s.heroPositions[name];
     if (s.characterInjection) delete s.characterInjection[name];
+    // Also drop the pin entry so the name doesn't linger as a ghost
+    // at the top of the roster.
+    if (Array.isArray(s.pinnedCharacters)) {
+        const lower = String(name || '').toLowerCase();
+        s.pinnedCharacters = s.pinnedCharacters.filter(n =>
+            typeof n !== 'string' || n.toLowerCase() !== lower
+        );
+    }
     saveSettings();
 }
