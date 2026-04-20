@@ -46,7 +46,11 @@ const DIALOGUE_COLORS = [
 let draft = null;
 let $modal = null;
 let listenersBound = false;
-let pendingInjectClear = false; // true between inject click and next GENERATION_ENDED
+let pendingInjectClear = false; // true while an inject prompt is queued
+// Number of GENERATION_STARTED fires to let pass before clearing. Set to 1
+// at inject time; the generation the inject was for passes without clearing,
+// any subsequent START triggers a clear in case GENERATION_ENDED never fired.
+let injectStartsToSkip = 0;
 
 function t(key, fallback, vars) {
     let s;
@@ -73,10 +77,14 @@ export function initCharacterWorkshop() {
         const name = e?.detail?.characterName;
         if (name) openCharacterWorkshop(name);
     });
-    // Clear the inject prompt after each generation so it's truly one-shot.
+    // Clear the inject prompt after the targeted generation. Belt-and-
+    // suspenders: trigger from ENDED/STOPPED (normal path) and also from
+    // the START of any *subsequent* generation (covers streaming paths or
+    // aborts where ENDED never fires).
     try {
         eventSource.on(event_types.GENERATION_ENDED, clearInjectPromptIfPending);
         eventSource.on(event_types.GENERATION_STOPPED, clearInjectPromptIfPending);
+        eventSource.on(event_types.GENERATION_STARTED, onGenerationStartedForInject);
     } catch (e) {
         console.warn('[Dooms Tracker] Workshop: failed to register GENERATION_ENDED listener', e);
     }
@@ -568,6 +576,10 @@ function injectIntoScene(name) {
             false,
         );
         pendingInjectClear = true;
+        // Allow the very next GENERATION_STARTED (the one this inject is
+        // intended for) to pass without clearing. Any subsequent START
+        // will trigger the clear.
+        injectStartsToSkip = 1;
         console.log(`[Dooms Tracker] Workshop: queued scene-inject for "${trimmed}"`);
     } catch (e) {
         console.warn('[Dooms Tracker] Workshop: setExtensionPrompt failed', e);
@@ -613,10 +625,25 @@ function clearInjectPromptIfPending() {
     if (!pendingInjectClear) return;
     try {
         setExtensionPrompt(INJECT_SLOT, '', extension_prompt_types.IN_PROMPT, 0, false);
-        console.log('[Dooms Tracker] Workshop: cleared scene-inject prompt after generation');
+        console.log('[Dooms Tracker] Workshop: cleared scene-inject prompt');
     } catch (e) {
         console.warn('[Dooms Tracker] Workshop: failed to clear inject prompt', e);
     } finally {
         pendingInjectClear = false;
+        injectStartsToSkip = 0;
+    }
+}
+
+function onGenerationStartedForInject() {
+    // The generation the inject is intended for should pass. After that,
+    // any START means a NEW generation is happening (swipe / regenerate /
+    // new turn) and we must not re-apply the old direction.
+    if (injectStartsToSkip > 0) {
+        injectStartsToSkip--;
+        return;
+    }
+    if (pendingInjectClear) {
+        console.log('[Dooms Tracker] Workshop: new generation starting — clearing stale inject');
+        clearInjectPromptIfPending();
     }
 }
