@@ -486,6 +486,29 @@ async function initUI() {
         // Rebuild cards so the new title attr takes effect immediately.
         try { updatePortraitBar(); } catch (e) { console.warn('[Dooms Tracker] updatePortraitBar() after tooltip toggle failed:', e); }
     });
+    // Subsection info popup (DES Settings → Expressions). Click the (i) button
+    // to toggle the help card; click anywhere else or press Esc to dismiss.
+    $(document).on('click', '#rpg-expressions-info-btn', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        const $popup = $('#rpg-expressions-info-popup');
+        const open = $popup.prop('hidden');
+        $popup.prop('hidden', !open);
+        $(this).attr('aria-expanded', open ? 'true' : 'false');
+    });
+    $(document).on('click', function (e) {
+        const $popup = $('#rpg-expressions-info-popup');
+        if (!$popup.length || $popup.prop('hidden')) return;
+        if ($(e.target).closest('#rpg-expressions-info-popup, #rpg-expressions-info-btn').length) return;
+        $popup.prop('hidden', true);
+        $('#rpg-expressions-info-btn').attr('aria-expanded', 'false');
+    });
+    $(document).on('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        const $popup = $('#rpg-expressions-info-popup');
+        if (!$popup.length || $popup.prop('hidden')) return;
+        $popup.prop('hidden', true);
+        $('#rpg-expressions-info-btn').attr('aria-expanded', 'false');
+    });
     $('#rpg-pb-per-chat-tracking').on('change', function() {
         extensionSettings.perChatCharacterTracking = $(this).prop('checked');
         saveSettings();

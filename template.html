@@ -365,7 +365,24 @@
                             <span class="rpg-toggle-slider"></span>
                         </label>
                     </div>
-                    <div class="rpg-subsection-label">Expressions</div>
+                    <div class="rpg-subsection-label rpg-subsection-with-info">
+                        <span>Expressions</span>
+                        <button type="button" class="rpg-section-info-btn" id="rpg-expressions-info-btn" aria-label="Help: Expressions" aria-expanded="false">
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                        </button>
+                        <div class="rpg-section-info-popup" id="rpg-expressions-info-popup" hidden>
+                            <h5>DES handles expressions</h5>
+                            <p>You do <strong>not</strong> need SillyTavern's separate <em>Expressions</em> extension. With <strong>Per-Character Expressions</strong> on, DES classifies each character's mood every turn and swaps the matching sprite onto their portrait card.</p>
+                            <h5>How to add sprites for a character</h5>
+                            <ol>
+                                <li>Open the character in <strong>Character Workshop</strong> &rarr; <strong>Appearance</strong> tab.</li>
+                                <li>Click <strong>Open expression folder</strong>.</li>
+                                <li>Drop PNG files <strong>directly into that folder</strong> (not into a sub-folder). Name them after the emotion: <code>happy.png</code>, <code>sad.png</code>, <code>angry.png</code>, <code>neutral.png</code>, <code>surprised.png</code>, etc.</li>
+                                <li>Reload SillyTavern. The next AI message will start swapping sprites automatically.</li>
+                            </ol>
+                            <p class="rpg-section-info-tip"><i class="fa-solid fa-lightbulb"></i> Turn on <strong>Show Expression in Tooltip</strong> below to see which label was picked when you hover a portrait.</p>
+                        </div>
+                    </div>
                     <div class="rpg-setting-row">
                         <div class="rpg-setting-label-group">
                             <span class="rpg-setting-label">Per-Character Expressions</span>
