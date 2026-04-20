@@ -194,8 +194,8 @@ export function initPortraitBar() {
                 <i class="fa-solid fa-face-smile"></i> Open Expression Folder
             </div>
             <div class="dooms-pb-ctx-divider"></div>
-            <div class="dooms-pb-ctx-item dooms-pb-ctx-danger" data-action="remove-character">
-                <i class="fa-solid fa-user-xmark"></i> Remove Character
+            <div class="dooms-pb-ctx-item" data-action="remove-character" title="Hide from this chat's Present Characters panel — data is kept in the Workshop Roster">
+                <i class="fa-solid fa-user-minus"></i> Remove from panel
             </div>
         </div>
     `;
@@ -1019,37 +1019,22 @@ function restoreCharacter(characterName) {
 }
 
 function removeCharacter(characterName) {
-    // Add to removed-characters blacklist so getCharacterList() filters them out
+    // Soft-remove: hide from the current chat's Present Characters panel
+    // by adding to the removedCharacters blacklist. Preserves the
+    // roster entry, portrait, color, and injection data so the character
+    // can still be found (and re-injected) via the Character Workshop /
+    // Roster. Full delete stays in those two surfaces.
     const removedList = getActiveRemovedCharacters();
-    if (!removedList.includes(characterName)) {
+    const lowerName = characterName.toLowerCase();
+    if (!removedList.some(n => n.toLowerCase() === lowerName)) {
         removedList.push(characterName);
     }
-    // Remove from known characters roster (case-insensitive — AI name variants)
-    const knownChars = getActiveKnownCharacters();
-    const lowerName = characterName.toLowerCase();
-    for (const key of Object.keys(knownChars)) {
-        if (key.toLowerCase() === lowerName) {
-            delete knownChars[key];
-        }
-    }
-    // Also remove their portrait if one exists (case-insensitive)
-    if (extensionSettings.npcAvatars) {
-        for (const key of Object.keys(extensionSettings.npcAvatars)) {
-            if (key.toLowerCase() === lowerName) {
-                delete extensionSettings.npcAvatars[key];
-            }
-        }
-    }
-    // Remove from entrance animation tracking so they don't re-trigger
+    // Reset entrance/cache tracking so a future re-add re-animates.
     _previousCharacterNames.delete(characterName);
     portraitFileCache.delete(characterName);
     saveCharacterRosterChange();
-    // Also save global settings for npcAvatars removal
-    if (extensionSettings.perChatCharacterTracking) {
-        saveSettings();
-    }
     updatePortraitBar();
-    console.log(`[Dooms Tracker] Character removed from roster: ${characterName}`);
+    console.log(`[Dooms Tracker] Character hidden from panel (soft remove): ${characterName}`);
 }
 
 // ─────────────────────────────────────────────
