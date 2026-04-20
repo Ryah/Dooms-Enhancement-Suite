@@ -17,6 +17,7 @@ import {
     saveSettings,
     saveChatData,
     getActiveKnownCharacters,
+    getActiveRemovedCharacters,
     saveCharacterRosterChange,
 } from '../../core/persistence.js';
 import { clearPortraitCache, updatePortraitBar, openExpressionFolder } from './portraitBar.js';
@@ -707,13 +708,28 @@ function injectIntoScene(name) {
     const trimmed = String(name || '').trim();
     if (!trimmed) return;
 
-    // 1. Roster membership
+    // 1. Roster membership + lift any soft-remove. If the user previously
+    //    right-clicked 'Remove from panel' the name sits in removedCharacters;
+    //    getCharacterList() filters those out AFTER the present-splice, so
+    //    without this the injected card would never appear.
     try {
         const roster = getActiveKnownCharacters();
         if (!roster[trimmed]) {
             roster[trimmed] = { emoji: '❓' };
             saveCharacterRosterChange();
         }
+        try {
+            const removed = getActiveRemovedCharacters();
+            if (Array.isArray(removed) && removed.length) {
+                const lower = trimmed.toLowerCase();
+                for (let i = removed.length - 1; i >= 0; i--) {
+                    if (typeof removed[i] === 'string' && removed[i].toLowerCase() === lower) {
+                        removed.splice(i, 1);
+                    }
+                }
+                saveCharacterRosterChange();
+            }
+        } catch (e) { /* best-effort un-hide */ }
         clearPortraitCache();
         updatePortraitBar();
     } catch (e) {
