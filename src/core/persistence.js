@@ -336,6 +336,17 @@ export function loadSettings() {
                 extensionSettings.settingsVersion = 17;
                 settingsChanged = true;
             }
+            // Migration to version 18: Initialize side-mode portrait-bar settings
+            if (currentVersion < 18) {
+                if (extensionSettings.portraitSidePush === undefined) {
+                    extensionSettings.portraitSidePush = false;
+                }
+                if (extensionSettings.portraitSideColumns === undefined) {
+                    extensionSettings.portraitSideColumns = 1;
+                }
+                extensionSettings.settingsVersion = 18;
+                settingsChanged = true;
+            }
 
             // Save migrated settings
             if (settingsChanged) {

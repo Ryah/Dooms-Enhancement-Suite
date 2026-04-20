@@ -84,7 +84,8 @@ import {
     updatePortraitBar,
     repositionPortraitBar,
     clearPortraitCache,
-    applyPortraitBarSettings
+    applyPortraitBarSettings,
+    applySideModeStyling
 } from './src/systems/ui/portraitBar.js';
 import { initCharacterWorkshop } from './src/systems/ui/characterWorkshop.js';
 import { initCharacterRoster } from './src/systems/ui/characterRoster.js';
@@ -406,6 +407,20 @@ async function initUI() {
         extensionSettings.portraitPosition = $(this).val();
         saveSettings();
         repositionPortraitBar();
+        // Show side-only options only when a side mode is active.
+        const isSide = $(this).val() === 'left' || $(this).val() === 'right';
+        $('#rpg-pb-side-options').toggle(isSide);
+    });
+    $('#rpg-pb-side-push').on('change', function() {
+        extensionSettings.portraitSidePush = $(this).prop('checked');
+        saveSettings();
+        try { applySideModeStyling(); } catch (e) {}
+    });
+    $('#rpg-pb-side-columns').on('change', function() {
+        const cols = parseInt($(this).val(), 10);
+        extensionSettings.portraitSideColumns = (cols >= 1 && cols <= 3) ? cols : 1;
+        saveSettings();
+        try { applySideModeStyling(); } catch (e) {}
     });
 
     // ── Portrait Bar customization ──
@@ -1452,6 +1467,14 @@ async function initUI() {
     $('#rpg-toggle-portrait-bar').prop('checked', extensionSettings.showPortraitBar ?? true);
     $('#rpg-portrait-alignment').val(extensionSettings.portraitAlignment || 'left');
     $('#rpg-portrait-position').val(extensionSettings.portraitPosition || 'above');
+    // Side-mode subordinate settings
+    $('#rpg-pb-side-push').prop('checked', extensionSettings.portraitSidePush === true);
+    $('#rpg-pb-side-columns').val(String(extensionSettings.portraitSideColumns || 1));
+    {
+        const sideOpen = extensionSettings.portraitPosition === 'left' || extensionSettings.portraitPosition === 'right';
+        $('#rpg-pb-side-options').toggle(sideOpen);
+        try { applySideModeStyling(); } catch (e) {}
+    }
     // Portrait Bar customization
     const pb = extensionSettings.portraitBarSettings || {};
     $('#rpg-pb-badge').text((extensionSettings.showPortraitBar ?? true) ? 'on' : 'off');

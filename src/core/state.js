@@ -252,7 +252,9 @@ export let extensionSettings = {
     characterColors: {}, // Per-character dialogue colors (key: character name, value: hex color string e.g. "#C71585")
     perChatCharacterTracking: false, // When true, knownCharacters/removedCharacters/characterColors are per-chat instead of global
     portraitAlignment: 'left', // Portrait bar alignment: 'left' (inline) or 'center'
-    portraitPosition: 'above', // Portrait bar position: 'above', 'below', or 'top' (top of screen)
+    portraitPosition: 'above', // Portrait bar position: 'above', 'below', 'top', 'left', or 'right'
+    portraitSidePush: false,    // Side mode: push chat aside (true) or hover over chat (false)
+    portraitSideColumns: 1,     // Side mode: number of card columns (1, 2, or 3)
     portraitBarSettings: {
         cardWidth: 110,              // Portrait card width in px
         cardHeight: 150,             // Portrait card height in px

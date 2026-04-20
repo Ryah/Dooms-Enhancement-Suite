@@ -20154,3 +20154,151 @@ body:has(.rpg-panel[data-theme="light"]) .rpg-strip-widget {
     vertical-align: middle;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
+
+/* ============================================================================
+   Present Characters Panel — Side modes (left / right)
+   The wrapper is appended to <body> with fixed positioning so it can sit
+   beside the chat regardless of #sheld's flex layout. Width = N card
+   widths + gaps + a little padding, where N comes from --dooms-pb-side-cols.
+   ============================================================================ */
+
+#dooms-portrait-bar-wrapper.dooms-pb-position-left,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right {
+    --dooms-pb-side-cols: 1; /* overridden by JS to 1, 2, or 3 */
+    --dooms-pb-side-gap: 8px;
+    --dooms-pb-side-pad: 10px;
+    --dooms-pb-side-toggle-h: 28px;
+    --dooms-pb-side-card-w: var(--dooms-pb-card-w, 110px);
+
+    position: fixed;
+    top: var(--topBarBlockSize, 40px);
+    bottom: 0;
+    z-index: 900;
+    width: calc(
+        var(--dooms-pb-side-cols) * var(--dooms-pb-side-card-w)
+        + (var(--dooms-pb-side-cols) - 1) * var(--dooms-pb-side-gap)
+        + var(--dooms-pb-side-pad) * 2
+    );
+    display: flex;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 0 18px rgba(0, 0, 0, 0.55);
+    transition: transform 0.25s ease, width 0.2s ease;
+}
+#dooms-portrait-bar-wrapper.dooms-pb-position-left  { left: 0;  border-right: 1px solid rgba(74, 123, 167, 0.4); }
+#dooms-portrait-bar-wrapper.dooms-pb-position-right { right: 0; border-left:  1px solid rgba(74, 123, 167, 0.4); }
+
+/* The bar itself fills the wrapper minus the toggle handle */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-portrait-bar,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-portrait-bar {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--dooms-pb-side-pad);
+    box-sizing: border-box;
+}
+
+/* Header: vertical stack at the top of the side panel */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-header,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 8px;
+}
+
+/* Hide the horizontal scroll arrows in side mode — vertical scroll is native */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-arrow,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-arrow {
+    display: none;
+}
+
+/* Scroll container becomes a vertical CSS grid with N columns */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-scroll,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-scroll {
+    display: grid;
+    grid-template-columns: repeat(var(--dooms-pb-side-cols), 1fr);
+    gap: var(--dooms-pb-side-gap);
+    overflow-y: auto;
+    overflow-x: hidden;
+    align-content: start;
+    justify-content: stretch;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-portrait-card,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-portrait-card {
+    width: 100%;            /* fill the column */
+    aspect-ratio: var(--dooms-pb-card-w, 110) / var(--dooms-pb-card-h, 150);
+    height: auto;           /* derive from aspect-ratio */
+}
+
+/* Repurpose the existing toggle as a collapse handle attached to the
+   inner edge of the panel. Kept narrow so it doesn't eat much width. */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-toggle,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-toggle {
+    flex: 0 0 auto;
+    height: var(--dooms-pb-side-toggle-h);
+    width: 100%;
+    border-radius: 0;
+    cursor: pointer;
+}
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-pb-toggle-chevron,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-pb-toggle-chevron {
+    transition: transform 0.2s;
+}
+/* Rotate the chevron so it points toward the screen edge in collapsed state */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left.dooms-pb-collapsed-side .dooms-pb-toggle-chevron {
+    transform: rotate(-90deg);
+}
+#dooms-portrait-bar-wrapper.dooms-pb-position-right.dooms-pb-collapsed-side .dooms-pb-toggle-chevron {
+    transform: rotate(90deg);
+}
+
+/* Collapsed side mode: shrink the wrapper to a thin strip showing only
+   the toggle handle. We piggyback on the existing .dooms-pb-collapsed
+   class set by the toggle click handler, but in side mode we only want
+   to hide the bar body — the toggle stays visible to re-open. */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left .dooms-portrait-bar.dooms-pb-collapsed,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right .dooms-portrait-bar.dooms-pb-collapsed {
+    display: none;
+}
+
+/* Push-aside layout: when toggled on, body gets a side margin so the
+   chat reflows next to the bar instead of being overlapped. Width
+   matches the bar width. We use the same calc to stay in sync with the
+   columns setting. */
+body.dooms-pb-side-push-left {
+    margin-left: calc(
+        var(--dooms-pb-side-cols, 1) * var(--dooms-pb-card-w, 110px)
+        + (var(--dooms-pb-side-cols, 1) - 1) * 8px
+        + 20px
+    );
+    transition: margin-left 0.2s ease;
+}
+body.dooms-pb-side-push-right {
+    margin-right: calc(
+        var(--dooms-pb-side-cols, 1) * var(--dooms-pb-card-w, 110px)
+        + (var(--dooms-pb-side-cols, 1) - 1) * 8px
+        + 20px
+    );
+    transition: margin-right 0.2s ease;
+}
+
+/* Side mode collapsed: shrink wrapper width to just the toggle handle. */
+#dooms-portrait-bar-wrapper.dooms-pb-position-left.dooms-pb-collapsed-side,
+#dooms-portrait-bar-wrapper.dooms-pb-position-right.dooms-pb-collapsed-side {
+    width: var(--dooms-pb-side-toggle-h, 28px);
+}
+/* Push-aside margin shrinks with the collapsed wrapper so chat reflows. */
+body.dooms-pb-side-push-left.dooms-pb-side-push-collapsed {
+    margin-left: var(--dooms-pb-side-toggle-h-fallback, 28px);
+}
+body.dooms-pb-side-push-right.dooms-pb-side-push-collapsed {
+    margin-right: var(--dooms-pb-side-toggle-h-fallback, 28px);
+}

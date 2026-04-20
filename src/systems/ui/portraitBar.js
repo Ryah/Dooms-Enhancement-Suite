@@ -202,7 +202,13 @@ export function initPortraitBar() {
     const $sendForm = $('#send_form');
     const $sheld = $('#sheld');
 
-    if (pos === 'top') {
+    if (pos === 'left' || pos === 'right') {
+        // Side modes are appended to <body> with fixed positioning so
+        // they sit beside the chat regardless of #sheld's flex layout.
+        $('body').append(wrapperHtml);
+        $('#dooms-portrait-bar-wrapper').addClass(`dooms-pb-position-${pos}`);
+        applySideModeStyling();
+    } else if (pos === 'top') {
         // Insert at the top of #sheld (before #chat) so it sits in the flex column
         const $chat = $sheld.find('#chat');
         if ($chat.length) {
@@ -228,13 +234,20 @@ export function initPortraitBar() {
         isExpanded = !isExpanded;
         const $bar = $('#dooms-portrait-bar');
         const $toggle = $(this);
+        const $wrapper = $('#dooms-portrait-bar-wrapper');
         if (isExpanded) {
             $bar.removeClass('dooms-pb-collapsed').addClass('dooms-pb-expanded');
             $toggle.addClass('dooms-pb-open');
+            $wrapper.removeClass('dooms-pb-collapsed-side');
         } else {
             $bar.removeClass('dooms-pb-expanded').addClass('dooms-pb-collapsed');
             $toggle.removeClass('dooms-pb-open');
+            // Also flag the wrapper so side-mode CSS can shrink it down
+            // and rotate the chevron to point toward the open direction.
+            $wrapper.addClass('dooms-pb-collapsed-side');
         }
+        // Side-mode push-aside margin needs to follow collapsed state too.
+        try { applySideModeStyling(); } catch (e) {}
     });
 
     // ── Scroll arrows ──
@@ -551,11 +564,17 @@ export function repositionPortraitBar() {
 
     const pos = extensionSettings.portraitPosition || 'above';
 
-    // Remove top-of-screen class first
-    $wrapper.removeClass('dooms-pb-position-top');
+    // Reset all position-mode classes; re-apply the active one below.
+    $wrapper.removeClass('dooms-pb-position-top dooms-pb-position-left dooms-pb-position-right');
+    // Side modes also drive a chat margin via body class — clear here so
+    // switching back to a non-side mode releases the chat.
+    $('body').removeClass('dooms-pb-side-push-left dooms-pb-side-push-right');
 
-    if (pos === 'top') {
-        // Insert at the top of #sheld (before #chat) so it sits in the flex column
+    if (pos === 'left' || pos === 'right') {
+        $('body').append($wrapper);
+        $wrapper.addClass(`dooms-pb-position-${pos}`);
+        applySideModeStyling();
+    } else if (pos === 'top') {
         const $sheld = $('#sheld');
         const $chat = $sheld.find('#chat');
         if ($chat.length) {
@@ -569,6 +588,33 @@ export function repositionPortraitBar() {
             $sendForm.after($wrapper);
         } else {
             $sendForm.before($wrapper);
+        }
+    }
+}
+
+/**
+ * Re-applies side-mode style hooks after position / push / column changes.
+ * Sets:
+ *   - the column-count CSS variable on the wrapper
+ *   - body class for the push-aside layout (left vs right)
+ * Safe to call when not in side mode (just no-ops the classes).
+ */
+export function applySideModeStyling() {
+    const pos = extensionSettings.portraitPosition || 'above';
+    const $wrapper = $('#dooms-portrait-bar-wrapper');
+    if (!$wrapper.length) return;
+
+    // Always update the column var so it tracks even if mode flips back.
+    const cols = Number(extensionSettings.portraitSideColumns) || 1;
+    const safeCols = cols < 1 ? 1 : cols > 3 ? 3 : cols;
+    $wrapper.css('--dooms-pb-side-cols', safeCols);
+
+    $('body').removeClass('dooms-pb-side-push-left dooms-pb-side-push-right dooms-pb-side-push-collapsed');
+    if ((pos === 'left' || pos === 'right') && extensionSettings.portraitSidePush === true) {
+        $('body').addClass(`dooms-pb-side-push-${pos}`);
+        // When collapsed, signal the body so it can use the narrower margin.
+        if ($wrapper.hasClass('dooms-pb-collapsed-side')) {
+            $('body').addClass('dooms-pb-side-push-collapsed');
         }
     }
 }

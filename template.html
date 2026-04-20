@@ -313,7 +313,32 @@
                             <option value="above">Above Input</option>
                             <option value="below">Below Input</option>
                             <option value="top">Top of Screen</option>
+                            <option value="left">Left Side</option>
+                            <option value="right">Right Side</option>
                         </select>
+                    </div>
+                    <div id="rpg-pb-side-options" style="display:none;">
+                        <div class="rpg-setting-row">
+                            <div class="rpg-setting-label-group">
+                                <span class="rpg-setting-label">Push Chat Aside</span>
+                                <span class="rpg-setting-hint">When on, the chat shifts to make room. When off, the bar floats over the chat.</span>
+                            </div>
+                            <label class="rpg-toggle-switch">
+                                <input type="checkbox" id="rpg-pb-side-push" />
+                                <span class="rpg-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="rpg-setting-row">
+                            <div class="rpg-setting-label-group">
+                                <span class="rpg-setting-label">Columns</span>
+                                <span class="rpg-setting-hint">Card grid width — 1 keeps the bar narrow, 2&ndash;3 fits more characters per row.</span>
+                            </div>
+                            <select id="rpg-pb-side-columns" class="rpg-accordion-select">
+                                <option value="1">1 wide</option>
+                                <option value="2">2 wide</option>
+                                <option value="3">3 wide</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="rpg-setting-row">
                         <div class="rpg-setting-label-group">
