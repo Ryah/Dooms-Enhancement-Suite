@@ -23,6 +23,25 @@ const isUserExtension = _scriptUrl.includes('/data/') || _scriptUrl.includes('\\
 export const extensionFolderPath = isUserExtension
     ? `data/default-user/extensions/${extensionName}`
     : `scripts/extensions/${extensionName}`;
+
+/**
+ * Extension version, loaded once from manifest.json so there's a single source of truth.
+ * Consumers should prefer getExtensionVersion() which resolves after the fetch completes.
+ */
+export let extensionVersion = '';
+let _versionPromise = null;
+export function getExtensionVersion() {
+    if (!_versionPromise) {
+        _versionPromise = fetch(`/${extensionFolderPath}/manifest.json`, { cache: 'no-cache' })
+            .then(res => res.ok ? res.json() : null)
+            .then(m => {
+                extensionVersion = (m && m.version) || '';
+                return extensionVersion;
+            })
+            .catch(() => '');
+    }
+    return _versionPromise;
+}
 /**
  * Default extension settings
  */

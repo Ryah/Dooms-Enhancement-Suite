@@ -4,7 +4,7 @@ import { selected_group, getGroupMembers } from '../../../group-chats.js';
 import { power_user } from '../../../power-user.js';
 import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../popup.js';
 // Core modules
-import { extensionName, extensionFolderPath } from './src/core/config.js';
+import { extensionName, extensionFolderPath, getExtensionVersion } from './src/core/config.js';
 import { i18n } from './src/core/i18n.js';
 import { migrateToV3JSON } from './src/utils/jsonMigration.js';
 import {
@@ -229,6 +229,10 @@ async function addExtensionSettings() {
             }
         })
         .catch(() => {});
+    // Populate version from manifest.json so the dropdown always reflects the current release
+    getExtensionVersion().then(v => {
+        if (v) $('#dooms-version-display').text(`v${v}`);
+    });
 }
 /**
  * Populates the Connection Profile dropdown from the Connection Manager extension.
