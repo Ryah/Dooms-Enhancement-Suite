@@ -217,6 +217,10 @@ async function addExtensionSettings() {
             $('#rpg-settings-popup').show();
         }
     });
+    // "Star on GitHub" button in the extension dropdown
+    $('#dooms-github-star-btn').on('click', function() {
+        window.open('https://github.com/DangerDaza/Dooms-Enhancement-Suite', '_blank', 'noopener,noreferrer');
+    });
 }
 /**
  * Populates the Connection Profile dropdown from the Connection Manager extension.
