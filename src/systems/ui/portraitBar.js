@@ -1029,6 +1029,26 @@ function removeCharacter(characterName) {
     // Roster. Full delete stays in those two surfaces.
     const removedList = getActiveRemovedCharacters();
     const lowerName = characterName.toLowerCase();
+
+    // Make sure the character exists in knownCharacters before we mark
+    // them removed. The knownChars seeding loop in getCharacterList
+    // happens AFTER the removed-filter, so a first-time soft-hide on an
+    // AI-only character would otherwise evaporate the roster entry and
+    // strand them with no Workshop/Roster surface to reach from.
+    try {
+        const knownChars = getActiveKnownCharacters();
+        if (!knownChars[characterName]) {
+            let emoji = '👤';
+            try {
+                const hit = getCharacterList().find(c => c && c.name === characterName);
+                if (hit?.emoji) emoji = hit.emoji;
+            } catch (e) { /* best-effort */ }
+            knownChars[characterName] = { emoji };
+        }
+    } catch (e) {
+        console.warn('[Dooms Tracker] Send to Workshop: failed to seed knownCharacters entry', e);
+    }
+
     if (!removedList.some(n => n.toLowerCase() === lowerName)) {
         removedList.push(characterName);
     }
@@ -1037,7 +1057,7 @@ function removeCharacter(characterName) {
     portraitFileCache.delete(characterName);
     saveCharacterRosterChange();
     updatePortraitBar();
-    console.log(`[Dooms Tracker] Character hidden from panel (soft remove): ${characterName}`);
+    console.log(`[Dooms Tracker] Character sent to Workshop (soft remove): ${characterName}`);
 }
 
 // ─────────────────────────────────────────────

@@ -386,6 +386,33 @@ export function loadSettings() {
                 extensionSettings.settingsVersion = 22;
                 settingsChanged = true;
             }
+            // Migration to version 23: Adopt orphaned soft-removed characters
+            // into the Workshop. Pre-1.9.2 "Send to Workshop" could leave a
+            // character in removedCharacters with no knownCharacters entry —
+            // then nothing surfaced them in the Workshop / Roster, so the
+            // "Return to panel" restore path was unreachable. Ensure every
+            // name in removedCharacters also has a roster record.
+            if (currentVersion < 23) {
+                const removed = extensionSettings.removedCharacters;
+                if (Array.isArray(removed) && removed.length) {
+                    if (!extensionSettings.knownCharacters || typeof extensionSettings.knownCharacters !== 'object') {
+                        extensionSettings.knownCharacters = {};
+                    }
+                    const known = extensionSettings.knownCharacters;
+                    let adopted = 0;
+                    for (const name of removed) {
+                        if (typeof name === 'string' && name && !known[name]) {
+                            known[name] = { emoji: '👤' };
+                            adopted++;
+                        }
+                    }
+                    if (adopted) {
+                        console.log(`[Dooms Tracker] Migration v23: adopted ${adopted} orphaned removed-characters into Workshop`);
+                    }
+                }
+                extensionSettings.settingsVersion = 23;
+                settingsChanged = true;
+            }
 
             // Save migrated settings
             if (settingsChanged) {
@@ -645,6 +672,30 @@ export function loadChatData() {
         }
         if (!chat_metadata.dooms_tracker.characterColors) {
             chat_metadata.dooms_tracker.characterColors = {};
+        }
+
+        // Adopt orphaned soft-removed characters into this chat's Workshop.
+        // Mirrors the global v23 settings migration — per-chat roster data
+        // saved before 1.9.2 could strand characters with a removedCharacters
+        // entry but no knownCharacters record, which left them unreachable
+        // from the Workshop / Roster.
+        try {
+            const meta = chat_metadata.dooms_tracker;
+            if (Array.isArray(meta.removedCharacters) && meta.removedCharacters.length) {
+                let adopted = 0;
+                for (const name of meta.removedCharacters) {
+                    if (typeof name === 'string' && name && !meta.knownCharacters[name]) {
+                        meta.knownCharacters[name] = { emoji: '👤' };
+                        adopted++;
+                    }
+                }
+                if (adopted) {
+                    console.log(`[Dooms Tracker] Per-chat orphan-adopt: moved ${adopted} removed-characters into Workshop`);
+                    saveChatDebounced();
+                }
+            }
+        } catch (e) {
+            console.warn('[Dooms Tracker] Per-chat orphan-adopt failed:', e.message);
         }
     }
 }

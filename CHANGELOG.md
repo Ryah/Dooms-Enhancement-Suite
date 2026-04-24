@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.9.2] - 2026-04-24
+
+### Fixed
+- **Send to Workshop could strand characters.** Soft-hiding a character that had only ever appeared in an AI response (no roster record yet) dropped them into `removedCharacters` before `getCharacterList` got a chance to seed `knownCharacters` — the removed-filter runs before the seeding loop, so the character vanished from the panel *and* the Workshop/Roster. The right-click "Send to Workshop" action now registers the character in `knownCharacters` first, so they always remain reachable.
+- **Auto-migration for pre-1.9.2 orphans.** Any existing soft-hidden characters without a matching `knownCharacters` entry are now adopted into the Workshop on load — both in the global settings (`settingsVersion` bumped to 23) and, on chat load, in per-chat character tracking data. Previously-stranded characters should appear in the Workshop / Roster again.
+
 ## [1.9.1] - 2026-04-20
 
 ### Added
