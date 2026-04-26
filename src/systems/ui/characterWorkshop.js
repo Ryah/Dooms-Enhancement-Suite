@@ -34,6 +34,24 @@ import { getContext } from '../../../../../../extensions.js';
 
 // SillyTavern extension-prompt slot key; must be unique per feature.
 const INJECT_SLOT = 'dooms-workshop-scene-inject';
+// Separate slot for "Eject from scene" — strong anti-inject direction
+// that tells the AI to stop writing this character even if they appear
+// in prior chat history. Distinct slot so eject can be set/cleared
+// independently of any pending inject.
+const EJECT_SLOT = 'dooms-workshop-scene-eject';
+
+const DEFAULT_EJECT_PROMPT =
+`[SCENE DIRECTION — REMOVE CHARACTER]
+The character "{name}" has left the scene and is no longer present. In your next response:
+- Do NOT have them speak.
+- Do NOT have them act.
+- Do NOT describe them as present.
+- Do NOT include them in your presentCharacters tracker output.
+
+If they appeared in earlier turns, treat that as a completed scene — they have moved on. Continue the current scene without them.
+
+This is a one-time direction from the user; do not mention these bracketed instructions in your reply.
+`;
 
 // Default scene-direction template. Users can override per-character via the
 // Injection tab. Supports {name}/{description}/{lorebook}/{relationship}
@@ -82,6 +100,11 @@ let injectStartsToSkip = 0;
 // regardless of casing. Each entry tracks anything we need to undo on
 // either a natural completion or a manual Cancel.
 const pendingInjects = new Map(); // name.toLowerCase() -> { name, disarmAttach: fn|null }
+
+// Mirror state for Eject — same lifecycle as inject (one-shot prompt,
+// clears on the generation after the eject was queued).
+let pendingEjectClear = false;
+let ejectStartsToSkip = 0;
 
 function broadcastInjectState(name, pending) {
     try {
@@ -234,6 +257,69 @@ export function cancelInject(name) {
 }
 
 /**
+ * Push back against a character the AI keeps writing into the scene
+ * even after the inject prompt cleared. Sends a strong one-shot
+ * direction telling the AI to drop them on the next turn — useful when
+ * past chat history has cemented them in context.
+ *
+ * Side effects:
+ *  - Cancels any pending inject for this character (since you can't be
+ *    both injecting and ejecting them at once).
+ *  - Removes them from the present-now splice if it was added by inject.
+ *  - Soft-removes them from the panel via removedCharacters so they
+ *    stop showing as a card while the eject is in flight.
+ *  - Sets a one-shot extension prompt under EJECT_SLOT that clears on
+ *    the next generation_ended (same lifecycle as inject).
+ */
+export function ejectFromScene(name) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return;
+
+    // If they're mid-inject, cancel that first (mutually exclusive).
+    if (pendingInjects.has(trimmed.toLowerCase())) {
+        try { cancelInject(trimmed); } catch (e) {}
+    }
+
+    // Soft-remove so the card disappears from the panel immediately.
+    try {
+        const removed = getActiveRemovedCharacters();
+        if (Array.isArray(removed)) {
+            const lower = trimmed.toLowerCase();
+            const already = removed.some(n => typeof n === 'string' && n.toLowerCase() === lower);
+            if (!already) {
+                removed.push(trimmed);
+                saveCharacterRosterChange();
+            }
+        }
+    } catch (e) {
+        console.warn('[Dooms Tracker] Workshop: ejectFromScene soft-remove failed', e);
+    }
+
+    // Build + queue the anti-inject prompt.
+    const prompt = DEFAULT_EJECT_PROMPT.replace(/\{name\}/g, trimmed);
+    try {
+        setExtensionPrompt(EJECT_SLOT, prompt, extension_prompt_types.IN_PROMPT, 0, false);
+        pendingEjectClear = true;
+        ejectStartsToSkip = 1;
+        console.log(`[Dooms Tracker] Workshop: queued scene-eject for "${trimmed}"`);
+    } catch (e) {
+        console.warn('[Dooms Tracker] Workshop: ejectFromScene setExtensionPrompt failed', e);
+    }
+
+    try { clearPortraitCache(); updatePortraitBar(); } catch (e) {}
+    try { renderThoughts(); } catch (e) {}
+    try {
+        if (window.toastr) {
+            window.toastr.info(
+                `${trimmed} will be removed from the next AI response. If they keep returning, you may also need to edit recent chat messages where they appeared.`,
+                'Character Ejected',
+                { timeOut: 6000 },
+            );
+        }
+    } catch (e) {}
+}
+
+/**
  * Force-clear ALL pending injections + Doom's extension-prompt slot. Used
  * when a character appears to be getting injected every turn (clear logic
  * jammed, AI continuing the pattern even after our slot cleared, etc.).
@@ -255,8 +341,15 @@ export function clearAllInjects() {
     } catch (e) {
         console.warn('[Dooms Tracker] Workshop: clearAllInjects setExtensionPrompt failed', e);
     }
+    // Also clear any pending eject — same logical bucket of "stuck
+    // one-shot directions we want gone".
+    try {
+        setExtensionPrompt(EJECT_SLOT, '', extension_prompt_types.IN_PROMPT, 0, false);
+    } catch (e) {}
     pendingInjectClear = false;
     injectStartsToSkip = 0;
+    pendingEjectClear = false;
+    ejectStartsToSkip = 0;
 
     for (const [, entry] of pendingInjects) {
         // Match cancelInject's per-character cleanup so each cancelled
@@ -742,6 +835,12 @@ function bindStaticListeners() {
         closeCharacterWorkshop();
     });
 
+    $modal.on('click.cw', '#cw-eject', () => {
+        if (!draft) return;
+        ejectFromScene(draft.name);
+        closeCharacterWorkshop();
+    });
+
     $modal.on('click.cw', '#cw-export', () => {
         if (!draft) return;
         try {
@@ -1217,33 +1316,50 @@ function buildInjectPrompt(name, extras) {
 }
 
 function clearInjectPromptIfPending() {
-    if (!pendingInjectClear) return;
-    try {
-        setExtensionPrompt(INJECT_SLOT, '', extension_prompt_types.IN_PROMPT, 0, false);
-        console.log('[Dooms Tracker] Workshop: cleared scene-inject prompt');
-    } catch (e) {
-        console.warn('[Dooms Tracker] Workshop: failed to clear inject prompt', e);
-    } finally {
-        pendingInjectClear = false;
-        injectStartsToSkip = 0;
-        // Inject completed naturally (AI responded) — mark everyone no-longer-pending.
-        for (const [, entry] of pendingInjects) {
-            broadcastInjectState(entry.name, false);
+    if (pendingInjectClear) {
+        try {
+            setExtensionPrompt(INJECT_SLOT, '', extension_prompt_types.IN_PROMPT, 0, false);
+            console.log('[Dooms Tracker] Workshop: cleared scene-inject prompt');
+        } catch (e) {
+            console.warn('[Dooms Tracker] Workshop: failed to clear inject prompt', e);
+        } finally {
+            pendingInjectClear = false;
+            injectStartsToSkip = 0;
+            for (const [, entry] of pendingInjects) {
+                broadcastInjectState(entry.name, false);
+            }
+            pendingInjects.clear();
         }
-        pendingInjects.clear();
+    }
+    if (pendingEjectClear) {
+        try {
+            setExtensionPrompt(EJECT_SLOT, '', extension_prompt_types.IN_PROMPT, 0, false);
+            console.log('[Dooms Tracker] Workshop: cleared scene-eject prompt');
+        } catch (e) {
+            console.warn('[Dooms Tracker] Workshop: failed to clear eject prompt', e);
+        } finally {
+            pendingEjectClear = false;
+            ejectStartsToSkip = 0;
+        }
     }
 }
 
 function onGenerationStartedForInject() {
-    // The generation the inject is intended for should pass. After that,
-    // any START means a NEW generation is happening (swipe / regenerate /
-    // new turn) and we must not re-apply the old direction.
+    // The generation the inject/eject is intended for should pass. After
+    // that, any START means a NEW generation is happening (swipe /
+    // regenerate / new turn) and we must not re-apply the old direction.
+    let skippedThisCall = false;
     if (injectStartsToSkip > 0) {
         injectStartsToSkip--;
-        return;
+        skippedThisCall = true;
     }
-    if (pendingInjectClear) {
-        console.log('[Dooms Tracker] Workshop: new generation starting — clearing stale inject');
+    if (ejectStartsToSkip > 0) {
+        ejectStartsToSkip--;
+        skippedThisCall = true;
+    }
+    if (skippedThisCall) return;
+    if (pendingInjectClear || pendingEjectClear) {
+        console.log('[Dooms Tracker] Workshop: new generation starting — clearing stale inject/eject');
         clearInjectPromptIfPending();
     }
 }
