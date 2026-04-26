@@ -800,8 +800,20 @@ function injectIntoScene(name) {
     const trimmed = String(name || '').trim();
     if (!trimmed) return;
 
+    // 0. Mark this character as mid-inject + broadcast BEFORE any portrait
+    //    bar render. The broadcast populates portraitBar's _injectingNames
+    //    Set so every subsequent updatePortraitBar() call (whether from
+    //    roster mutation, mark-present, or the broadcast itself) renders
+    //    the INJECTING overlay consistently. Stuffing it in late meant the
+    //    early renders briefly showed a card with no overlay, and any
+    //    failure in the later steps could leave the overlay missing
+    //    entirely. disarmAttach is filled in at step 5 once we know
+    //    whether a portrait was actually attached.
+    pendingInjects.set(trimmed.toLowerCase(), { name: trimmed, disarmAttach: null });
+    broadcastInjectState(trimmed, true);
+
     // 1. Roster membership + lift any soft-remove. If the user previously
-    //    right-clicked 'Remove from panel' the name sits in removedCharacters;
+    //    right-clicked 'Send to Workshop' the name sits in removedCharacters;
     //    getCharacterList() filters those out AFTER the present-splice, so
     //    without this the injected card would never appear.
     try {
@@ -822,8 +834,6 @@ function injectIntoScene(name) {
                 saveCharacterRosterChange();
             }
         } catch (e) { /* best-effort un-hide */ }
-        clearPortraitCache();
-        updatePortraitBar();
     } catch (e) {
         console.warn('[Dooms Tracker] Workshop: failed to add to roster before inject', e);
     }
@@ -831,6 +841,8 @@ function injectIntoScene(name) {
     // 1b. Mark the character as PRESENT in the current scene immediately so
     //     the Present Characters panel highlights them right away, instead
     //     of waiting for the next AI turn to put them into characterThoughts.
+    //     This calls updatePortraitBar() internally, which by now sees both
+    //     the present splice AND the injecting state.
     try { markCharacterPresentNow(trimmed); } catch (e) {
         console.warn('[Dooms Tracker] Workshop: failed to mark character present', e);
     }
@@ -880,18 +892,20 @@ function injectIntoScene(name) {
     //    user's next outgoing message; SillyTavern's Generate then includes
     //    that image in the request payload (multimodal APIs only).
     let attached = false;
-    let disarmAttach = null;
     if (extensionSettings?.injectAttachPortrait === true && draft?.avatar) {
-        disarmAttach = armPortraitAttach(trimmed, draft.avatar);
+        const disarmAttach = armPortraitAttach(trimmed, draft.avatar);
+        // Update the pending entry so cancelInject can disarm later.
+        const entry = pendingInjects.get(trimmed.toLowerCase());
+        if (entry) entry.disarmAttach = disarmAttach;
         attached = true;
     }
 
-    // 5b. Track this character as mid-inject so the portrait-bar can show
-    //     an 'INJECTING' overlay and a right-click Cancel menu item.
-    pendingInjects.set(trimmed.toLowerCase(), { name: trimmed, disarmAttach });
-    broadcastInjectState(trimmed, true);
+    // 6. Belt-and-suspenders: one final render after every state change is
+    //    in place. Cheap, idempotent, and protects against any earlier
+    //    render that may have been swallowed by a thrown handler upstream.
+    try { clearPortraitCache(); updatePortraitBar(); } catch (e) {}
 
-    // 6. User feedback
+    // 7. User feedback
     try {
         if (window.toastr) {
             const extras = [];
