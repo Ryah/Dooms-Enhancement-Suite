@@ -2155,6 +2155,15 @@
                             <span class="muted" style="font-size: var(--modal-font-small, 0.8rem);">Off by default. Setting is global, not per-character.</span>
                         </div>
                     </div>
+                    <div class="rpg-editor-section">
+                        <h4>Stuck injection?</h4>
+                        <p class="helper">Inject into Scene is a one-shot direction &mdash; it should clear after the AI's next reply. If a character keeps getting referenced every turn anyway, force-wipe Doom's injection slot here. Your stored description, lorebook attachment, and prompt template are kept; only the live pending injection is cleared.</p>
+                        <div class="rpg-field rpg-field-row">
+                            <button type="button" class="rpg-btn rpg-btn-ghost" id="cw-clear-all-injects" title="Clear Doom's extension-prompt slot and drop all pending inject overlays">
+                                <i class="fa-solid fa-broom"></i> Clear all pending injections
+                            </button>
+                        </div>
+                    </div>
                 </section>
 
             </main>

@@ -229,6 +229,49 @@ export function cancelInject(name) {
     console.log(`[Dooms Tracker] Workshop: inject cancelled for "${entry.name}"`);
 }
 
+/**
+ * Force-clear ALL pending injections + Doom's extension-prompt slot. Used
+ * when a character appears to be getting injected every turn (clear logic
+ * jammed, AI continuing the pattern even after our slot cleared, etc.).
+ *
+ * Wipes:
+ *  - the SillyTavern extension prompt under INJECT_SLOT
+ *  - pendingInjectClear / injectStartsToSkip flags
+ *  - every entry in pendingInjects (with disarmAttach if armed)
+ *  - the portrait-bar overlay state via broadcast (one event per entry)
+ *
+ * Does NOT touch knownCharacters, characterInjection (description /
+ * lorebook / promptTemplate), characterColors, or any user-stored data.
+ */
+export function clearAllInjects() {
+    let count = 0;
+
+    try {
+        setExtensionPrompt(INJECT_SLOT, '', extension_prompt_types.IN_PROMPT, 0, false);
+    } catch (e) {
+        console.warn('[Dooms Tracker] Workshop: clearAllInjects setExtensionPrompt failed', e);
+    }
+    pendingInjectClear = false;
+    injectStartsToSkip = 0;
+
+    for (const [, entry] of pendingInjects) {
+        try { entry.disarmAttach?.(); } catch (e) {}
+        broadcastInjectState(entry.name, false);
+        count++;
+    }
+    pendingInjects.clear();
+
+    try {
+        if (window.toastr) {
+            const msg = count > 0
+                ? `Cleared ${count} pending injection${count === 1 ? '' : 's'} and wiped the inject prompt slot.`
+                : 'No pending injections tracked. Inject prompt slot wiped just in case.';
+            window.toastr.info(msg, 'Character Workshop', { timeOut: 4000 });
+        }
+    } catch (e) {}
+    console.log(`[Dooms Tracker] Workshop: clearAllInjects — cleared ${count} pending`);
+}
+
 // ---------------------------------------------------------------------------
 
 function ensureModal() {
@@ -588,6 +631,11 @@ function bindStaticListeners() {
         draft.injection.promptTemplate = DEFAULT_INJECT_PROMPT;
         draft.dirty.injection = true;
         $modal.find('#cw-inj-prompt').val(DEFAULT_INJECT_PROMPT).trigger('focus');
+    });
+
+    $modal.on('click.cw', '#cw-clear-all-injects', function (e) {
+        e.preventDefault();
+        clearAllInjects();
     });
 
     // "Attach portrait to message" — global setting (not per-character).
