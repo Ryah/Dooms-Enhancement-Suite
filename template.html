@@ -2156,6 +2156,17 @@
                         </div>
                     </div>
                     <div class="rpg-editor-section">
+                        <h4>Banish from generations</h4>
+                        <p class="helper">When on, every AI generation receives a standing direction telling it that this character is <strong>not in the scene</strong> and must not appear &mdash; no dialogue, no actions, no presence. Use when a character keeps reappearing turn after turn even after Eject. Also soft-removes them from the panel. Toggle off to allow them back in.</p>
+                        <div class="rpg-field rpg-field-row" style="align-items:center;">
+                            <label class="rpg-switch">
+                                <input type="checkbox" id="cw-banish">
+                                <span class="rpg-switch-track"></span>
+                            </label>
+                            <span class="muted" style="font-size: var(--modal-font-small, 0.8rem);">Standing ban &mdash; persists across turns and reloads until you toggle it off.</span>
+                        </div>
+                    </div>
+                    <div class="rpg-editor-section">
                         <h4>Stuck injection?</h4>
                         <p class="helper">Inject into Scene is a one-shot direction &mdash; it should clear after the AI's next reply. If a character keeps getting referenced every turn anyway, force-wipe Doom's injection slot here. Your stored description, lorebook attachment, and prompt template are kept; only the live pending injection is cleared.</p>
                         <div class="rpg-field rpg-field-row">

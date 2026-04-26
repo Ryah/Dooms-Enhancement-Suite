@@ -469,6 +469,7 @@ export function saveChatData() {
         trackerData.knownCharacters = chat_metadata.dooms_tracker?.knownCharacters || {};
         trackerData.removedCharacters = chat_metadata.dooms_tracker?.removedCharacters || [];
         trackerData.characterColors = chat_metadata.dooms_tracker?.characterColors || {};
+        trackerData.bannedCharacters = chat_metadata.dooms_tracker?.bannedCharacters || [];
     }
     chat_metadata.dooms_tracker = trackerData;
     // Use debounced save — the standard SillyTavern pattern.
@@ -738,6 +739,25 @@ export function getActiveRemovedCharacters() {
         extensionSettings.removedCharacters = [];
     }
     return extensionSettings.removedCharacters;
+}
+
+/**
+ * Returns the active bannedCharacters array — names the user has explicitly
+ * marked as "not in this scene, ever". Workshop pushes a standing extension
+ * prompt so the AI is told every turn not to include them.
+ * @returns {Array<string>}
+ */
+export function getActiveBannedCharacters() {
+    if (extensionSettings.perChatCharacterTracking && chat_metadata?.dooms_tracker) {
+        if (!Array.isArray(chat_metadata.dooms_tracker.bannedCharacters)) {
+            chat_metadata.dooms_tracker.bannedCharacters = [];
+        }
+        return chat_metadata.dooms_tracker.bannedCharacters;
+    }
+    if (!Array.isArray(extensionSettings.bannedCharacters)) {
+        extensionSettings.bannedCharacters = [];
+    }
+    return extensionSettings.bannedCharacters;
 }
 
 /**

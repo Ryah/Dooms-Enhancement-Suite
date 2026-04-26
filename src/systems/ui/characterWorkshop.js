@@ -18,6 +18,7 @@ import {
     saveChatData,
     getActiveKnownCharacters,
     getActiveRemovedCharacters,
+    getActiveBannedCharacters,
     saveCharacterRosterChange,
 } from '../../core/persistence.js';
 import { clearPortraitCache, updatePortraitBar, openExpressionFolder } from './portraitBar.js';
@@ -39,6 +40,11 @@ const INJECT_SLOT = 'dooms-workshop-scene-inject';
 // in prior chat history. Distinct slot so eject can be set/cleared
 // independently of any pending inject.
 const EJECT_SLOT = 'dooms-workshop-scene-eject';
+// Persistent ban slot — populated whenever bannedCharacters is non-empty,
+// stays in the prompt every turn until the user un-banishes everyone.
+// Eject is one-shot; this is the standing version for "the AI keeps
+// writing this character no matter what I do."
+const BAN_SLOT = 'dooms-workshop-banned-characters';
 
 const DEFAULT_EJECT_PROMPT =
 `[SCENE DIRECTION — REMOVE CHARACTER]
@@ -106,6 +112,101 @@ const pendingInjects = new Map(); // name.toLowerCase() -> { name, disarmAttach:
 let pendingEjectClear = false;
 let ejectStartsToSkip = 0;
 
+/**
+ * Push the standing "these characters are not in this scene" prompt into
+ * the BAN_SLOT extension prompt, or clear it if no one is currently
+ * banished. Called whenever bannedCharacters changes and once at init so
+ * the slot is repopulated on extension load.
+ */
+function refreshBanPrompt() {
+    let banned = [];
+    try { banned = getActiveBannedCharacters() || []; } catch (e) {}
+    if (!Array.isArray(banned) || banned.length === 0) {
+        try {
+            setExtensionPrompt(BAN_SLOT, '', extension_prompt_types.IN_PROMPT, 0, false);
+        } catch (e) {}
+        return;
+    }
+    const list = banned.map(n => `- "${n}"`).join('\n');
+    const prompt =
+`[SCENE DIRECTION — CHARACTERS NOT IN SCENE]
+The following characters are NOT in the current scene and must NOT appear in your response:
+${list}
+
+For each banished character:
+- Do NOT have them speak.
+- Do NOT have them act or be present.
+- Do NOT include them in your presentCharacters tracker output.
+- If they were referenced in earlier turns, treat that as a completed scene — they are no longer present.
+
+This is a standing direction; do not mention these bracketed instructions in your reply.
+`;
+    try {
+        setExtensionPrompt(BAN_SLOT, prompt, extension_prompt_types.IN_PROMPT, 0, false);
+    } catch (e) {
+        console.warn('[Dooms Tracker] Workshop: refreshBanPrompt setExtensionPrompt failed', e);
+    }
+}
+
+/**
+ * Toggle a character's banished state. When banished:
+ *  - Added to the active bannedCharacters list (per-chat or global per
+ *    perChatCharacterTracking).
+ *  - Soft-removed from the panel via removedCharacters so the card
+ *    disappears immediately (matches the user intent).
+ *  - The standing BAN_SLOT extension prompt is refreshed so the AI is
+ *    told not to include them on the next and every subsequent turn
+ *    until the user un-banishes.
+ * When un-banished: removed from bannedCharacters; soft-remove is left
+ * alone (the user can restore via the Workshop's banner).
+ */
+export function setCharacterBanished(name, banished) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return;
+    const lower = trimmed.toLowerCase();
+    let banned;
+    try { banned = getActiveBannedCharacters(); } catch (e) { return; }
+    if (!Array.isArray(banned)) return;
+    const isCurrentlyBanned = banned.some(n => typeof n === 'string' && n.toLowerCase() === lower);
+    if (banished && !isCurrentlyBanned) {
+        banned.push(trimmed);
+        // Soft-remove so the card drops out of the panel immediately.
+        try {
+            const removed = getActiveRemovedCharacters();
+            if (Array.isArray(removed) && !removed.some(n => typeof n === 'string' && n.toLowerCase() === lower)) {
+                removed.push(trimmed);
+            }
+        } catch (e) {}
+        saveCharacterRosterChange();
+        try { saveSettings(); } catch (e) {}
+        refreshBanPrompt();
+        try { clearPortraitCache(); updatePortraitBar(); } catch (e) {}
+        try { renderThoughts(); } catch (e) {}
+    } else if (!banished && isCurrentlyBanned) {
+        for (let i = banned.length - 1; i >= 0; i--) {
+            if (typeof banned[i] === 'string' && banned[i].toLowerCase() === lower) {
+                banned.splice(i, 1);
+            }
+        }
+        saveCharacterRosterChange();
+        try { saveSettings(); } catch (e) {}
+        refreshBanPrompt();
+    }
+}
+
+/**
+ * Lookup helper used by the Workshop's UI to render the toggle state.
+ */
+function isCharacterBanished(name) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return false;
+    const lower = trimmed.toLowerCase();
+    try {
+        const banned = getActiveBannedCharacters();
+        return Array.isArray(banned) && banned.some(n => typeof n === 'string' && n.toLowerCase() === lower);
+    } catch (e) { return false; }
+}
+
 function broadcastInjectState(name, pending) {
     try {
         window.dispatchEvent(new CustomEvent('dooms:inject-state-changed', {
@@ -165,6 +266,15 @@ export function initCharacterWorkshop() {
     } catch (e) {
         console.warn('[Dooms Tracker] Workshop: failed to register GENERATION_ENDED listener', e);
     }
+    // Repopulate the standing ban prompt from saved bannedCharacters so it
+    // survives a page reload. Also re-fire on chat changes since the banned
+    // list is per-chat when perChatCharacterTracking is on.
+    try { refreshBanPrompt(); } catch (e) {}
+    try {
+        eventSource.on(event_types.CHAT_CHANGED, () => {
+            try { refreshBanPrompt(); } catch (err) {}
+        });
+    } catch (e) {}
 }
 
 export function openCharacterWorkshop(characterName) {
@@ -544,6 +654,9 @@ function renderInjection() {
 
     // Sync the global "Attach portrait to message" toggle.
     $modal.find('#cw-inj-attach-portrait').prop('checked', extensionSettings?.injectAttachPortrait === true);
+
+    // Sync the per-character Banish toggle.
+    $modal.find('#cw-banish').prop('checked', isCharacterBanished(draft.name));
 }
 
 function renderLorebookComboList(filter) {
@@ -748,6 +861,22 @@ function bindStaticListeners() {
     $modal.on('click.cw', '#cw-clear-all-injects', function (e) {
         e.preventDefault();
         clearAllInjects();
+    });
+
+    $modal.on('change.cw', '#cw-banish', function () {
+        if (!draft) return;
+        const checked = $(this).prop('checked');
+        setCharacterBanished(draft.name, !!checked);
+        renderHiddenBanner();
+        try {
+            if (window.toastr) {
+                if (checked) {
+                    window.toastr.info(`"${draft.name}" is now banished — every AI generation will be told they're not in the scene.`, 'Character Workshop', { timeOut: 5000 });
+                } else {
+                    window.toastr.info(`"${draft.name}" is no longer banished.`, 'Character Workshop', { timeOut: 3000 });
+                }
+            }
+        } catch (e) {}
     });
 
     // "Attach portrait to message" — global setting (not per-character).
