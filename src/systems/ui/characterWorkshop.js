@@ -946,16 +946,31 @@ function markCharacterPresentNow(name) {
         parsed = { characters: [] };
     }
     if (!parsed || typeof parsed !== 'object') parsed = { characters: [] };
-    if (!Array.isArray(parsed.characters)) parsed.characters = [];
+
+    // The AI sometimes emits characterThoughts as a bare array
+    //   [ {name: "X"}, ... ]
+    // and sometimes as { characters: [...] } — getCharacterList() accepts
+    // both, so we have to too. Pick the right list to mutate, push there,
+    // then serialize in the original shape. Earlier code did
+    //   if (!Array.isArray(parsed.characters)) parsed.characters = [];
+    // but when `parsed` itself was the array, that assigned a non-index
+    // property which JSON.stringify SILENTLY DROPS, so the new entry
+    // never reached the panel and the character ended up showing as
+    // absent instead of present.
+    const wasArray = Array.isArray(parsed);
+    let charactersArr;
+    if (wasArray) {
+        charactersArr = parsed;
+    } else {
+        if (!Array.isArray(parsed.characters)) parsed.characters = [];
+        charactersArr = parsed.characters;
+    }
 
     const lower = trimmed.toLowerCase();
-    const existing = parsed.characters.find(c => typeof c?.name === 'string' && c.name.toLowerCase() === lower);
+    const existing = charactersArr.find(c => typeof c?.name === 'string' && c.name.toLowerCase() === lower);
     if (!existing) {
-        // Build a minimal "present" entry. thoughts stays empty so the
-        // existing off-scene pattern filter in getCharacterList doesn't
-        // accidentally exclude them.
         const rel = extensionSettings?.characterRelationships?.[trimmed];
-        parsed.characters.push({
+        charactersArr.push({
             name: trimmed,
             emoji: '🙂',
             thoughts: { content: '' },
@@ -963,17 +978,11 @@ function markCharacterPresentNow(name) {
         });
     }
 
-    // Write back in the same shape the rest of the codebase expects
-    // (characterThoughts is normally a JSON string).
-    const serialized = JSON.stringify(parsed);
+    const serialized = JSON.stringify(wasArray ? charactersArr : parsed);
     try { updateLastGeneratedData({ characterThoughts: serialized }); }
     catch (e) { console.warn('[Dooms Tracker] Workshop: updateLastGeneratedData failed', e); }
 
-    // Mirror the classic persistence pattern — write to chat_metadata so a
-    // reload keeps the character in the panel until the AI updates it.
     try { saveChatData(); } catch (e) { /* best-effort */ }
-
-    // Refresh the UI surfaces that key off the present list.
     try { clearPortraitCache(); updatePortraitBar(); } catch (e) {}
     try { renderThoughts(); } catch (e) {}
 }
@@ -992,12 +1001,34 @@ function unmarkCharacterPresentNow(name) {
     try {
         parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     } catch (e) { return; }
-    if (!parsed || !Array.isArray(parsed.characters)) return;
+    if (!parsed || typeof parsed !== 'object') return;
+
+    // Same dual-shape handling as markCharacterPresentNow — accept either
+    // a bare array or { characters: [...] }, mutate in place, serialize
+    // back in the original shape so we don't silently drop entries.
+    const wasArray = Array.isArray(parsed);
+    let charactersArr;
+    if (wasArray) {
+        charactersArr = parsed;
+    } else if (Array.isArray(parsed.characters)) {
+        charactersArr = parsed.characters;
+    } else {
+        return;
+    }
+
     const lower = trimmed.toLowerCase();
-    const before = parsed.characters.length;
-    parsed.characters = parsed.characters.filter(c => typeof c?.name !== 'string' || c.name.toLowerCase() !== lower);
-    if (parsed.characters.length === before) return;
-    try { updateLastGeneratedData({ characterThoughts: JSON.stringify(parsed) }); } catch (e) {}
+    const before = charactersArr.length;
+    const filtered = charactersArr.filter(c => typeof c?.name !== 'string' || c.name.toLowerCase() !== lower);
+    if (filtered.length === before) return;
+
+    let serialized;
+    if (wasArray) {
+        serialized = JSON.stringify(filtered);
+    } else {
+        parsed.characters = filtered;
+        serialized = JSON.stringify(parsed);
+    }
+    try { updateLastGeneratedData({ characterThoughts: serialized }); } catch (e) {}
     try { saveChatData(); } catch (e) {}
     try { clearPortraitCache(); updatePortraitBar(); } catch (e) {}
     try { renderThoughts(); } catch (e) {}
