@@ -216,9 +216,13 @@ export function cancelInject(name) {
     // Disarm the portrait-attach listener if one was armed for this char.
     try { entry.disarmAttach?.(); } catch (e) {}
 
-    // Undo the "present now" splice so the character no longer sits in the
-    // panel as though they were in the scene.
-    try { unmarkCharacterPresentNow(entry.name); } catch (e) {}
+    // Undo the "present now" splice ONLY if we actually added it. If the
+    // character was already in the live tracker (AI confirmed them on a
+    // prior turn), the inject was a no-op splice and unmarking would
+    // erroneously remove a legitimately-present character.
+    if (entry.didSplice) {
+        try { unmarkCharacterPresentNow(entry.name); } catch (e) {}
+    }
 
     pendingInjects.delete(key);
     broadcastInjectState(entry.name, false);
@@ -255,11 +259,26 @@ export function clearAllInjects() {
     injectStartsToSkip = 0;
 
     for (const [, entry] of pendingInjects) {
+        // Match cancelInject's per-character cleanup so each cancelled
+        // character returns to the same place they would've been before
+        // Inject was clicked: out of the Present splice (only if we
+        // added it), off the INJECTING overlay, and with their attach
+        // listener disarmed. Skip unmark for entries the AI had already
+        // confirmed pre-inject.
         try { entry.disarmAttach?.(); } catch (e) {}
+        if (entry.didSplice) {
+            try { unmarkCharacterPresentNow(entry.name); } catch (e) {}
+        }
         broadcastInjectState(entry.name, false);
         count++;
     }
     pendingInjects.clear();
+
+    // Belt-and-suspenders: even if every per-character unmark above
+    // already triggered a re-render, run one final pass so the panel +
+    // thoughts surface settle on a clean state regardless of order.
+    try { clearPortraitCache(); updatePortraitBar(); } catch (e) {}
+    try { renderThoughts(); } catch (e) {}
 
     try {
         if (window.toastr) {
@@ -857,7 +876,7 @@ function injectIntoScene(name) {
     //    failure in the later steps could leave the overlay missing
     //    entirely. disarmAttach is filled in at step 5 once we know
     //    whether a portrait was actually attached.
-    pendingInjects.set(trimmed.toLowerCase(), { name: trimmed, disarmAttach: null });
+    pendingInjects.set(trimmed.toLowerCase(), { name: trimmed, disarmAttach: null, didSplice: false });
     broadcastInjectState(trimmed, true);
 
     // 1. Roster membership + lift any soft-remove. If the user previously
@@ -890,9 +909,16 @@ function injectIntoScene(name) {
     //     the Present Characters panel highlights them right away, instead
     //     of waiting for the next AI turn to put them into characterThoughts.
     //     This calls updatePortraitBar() internally, which by now sees both
-    //     the present splice AND the injecting state.
-    try { markCharacterPresentNow(trimmed); } catch (e) {
+    //     the present splice AND the injecting state. Track whether the
+    //     splice actually added (vs. found an existing entry) so cancel
+    //     doesn't erroneously remove an AI-confirmed character.
+    let didSplice = false;
+    try { didSplice = markCharacterPresentNow(trimmed); } catch (e) {
         console.warn('[Dooms Tracker] Workshop: failed to mark character present', e);
+    }
+    {
+        const entry = pendingInjects.get(trimmed.toLowerCase());
+        if (entry) entry.didSplice = !!didSplice;
     }
 
     // 2. Resolve any persisted injection extras (description + lorebook + relationship + prompt template).
@@ -979,10 +1005,14 @@ function injectIntoScene(name) {
  * getCharacterList() and the Present Characters panel). Persists through
  * saveChatData so the state survives a reload until the next AI turn
  * either confirms or drops the character.
+ *
+ * Returns true if a new entry was spliced in (so cancel/clear knows it
+ * needs to undo this on revert), false if the character was already
+ * present from a prior AI turn (no-op — leave them alone on cancel).
  */
 function markCharacterPresentNow(name) {
     const trimmed = String(name || '').trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
 
     const raw = lastGeneratedData?.characterThoughts;
     let parsed;
@@ -1016,15 +1046,20 @@ function markCharacterPresentNow(name) {
 
     const lower = trimmed.toLowerCase();
     const existing = charactersArr.find(c => typeof c?.name === 'string' && c.name.toLowerCase() === lower);
-    if (!existing) {
-        const rel = extensionSettings?.characterRelationships?.[trimmed];
-        charactersArr.push({
-            name: trimmed,
-            emoji: '🙂',
-            thoughts: { content: '' },
-            ...(rel ? { relationship: { status: rel } } : {}),
-        });
+    if (existing) {
+        // Already in the live tracker (AI confirmed them on a prior turn).
+        // Don't splice again, and signal "no undo needed" so cancel won't
+        // erroneously remove a character the AI legitimately introduced.
+        return false;
     }
+
+    const rel = extensionSettings?.characterRelationships?.[trimmed];
+    charactersArr.push({
+        name: trimmed,
+        emoji: '🙂',
+        thoughts: { content: '' },
+        ...(rel ? { relationship: { status: rel } } : {}),
+    });
 
     const serialized = JSON.stringify(wasArray ? charactersArr : parsed);
     try { updateLastGeneratedData({ characterThoughts: serialized }); }
@@ -1033,6 +1068,7 @@ function markCharacterPresentNow(name) {
     try { saveChatData(); } catch (e) { /* best-effort */ }
     try { clearPortraitCache(); updatePortraitBar(); } catch (e) {}
     try { renderThoughts(); } catch (e) {}
+    return true;
 }
 
 /**
