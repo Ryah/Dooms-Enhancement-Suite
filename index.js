@@ -1896,6 +1896,18 @@ async function initUI() {
                     action: () => { $icon.trigger('click'); },
                 });
             });
+            // DeepLore Enhanced extension button (only shown when installed)
+            const $deepLoreBtn = $('#DeepLoreDrawerIcon').length
+                ? $('#DeepLoreDrawerIcon')
+                : $('[data-drawer-id="DeepLore"]').first();
+            if ($deepLoreBtn.length) {
+                items.push({
+                    id: 'deeplore',
+                    label: 'DeepLore',
+                    iconClass: 'fa-solid fa-book',
+                    action: () => { $deepLoreBtn.trigger('click'); },
+                });
+            }
             items.push({
                 id: 'des-settings',
                 label: "Doom's Settings",
