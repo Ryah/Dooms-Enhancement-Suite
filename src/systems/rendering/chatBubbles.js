@@ -645,7 +645,13 @@ export function applyChatBubbles(messageElement, style) {
     tempContainer.innerHTML = mesText.getAttribute('data-dooms-original-html');
 
     // Find all divs with gradient backgrounds (GFX blocks)
-    const gfxDivs = Array.from(tempContainer.querySelectorAll('div[style*="gradient"]'));
+    // Find all divs that look like GFX blocks (styled divs with specific patterns)
+    const gfxDivs = Array.from(tempContainer.querySelectorAll('div[style*="background"], div[style*="border"], div[style*="padding"]')).filter(div => {
+        const style = div.getAttribute('style') || '';
+        // GFX blocks typically have multiple style properties
+        return (style.includes('background') || style.includes('color')) &&
+            (style.includes('padding') || style.includes('border') || style.includes('margin'));
+    });
 
     console.log('[Dooms Chat Bubbles] Found', gfxDivs.length, 'GFX divs');
 
