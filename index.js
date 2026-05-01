@@ -293,6 +293,7 @@ function loadChatBubbleSettingsUI() {
 
     // Toggles
     $('#rpg-cb-show-avatars').prop('checked', cbs.showAvatars !== false);
+    $('#rpg-cb-skip-styled-divs').prop('checked', cbs.skipStyledDivs !== false);
     $('#rpg-cb-show-author-names').prop('checked', cbs.showAuthorNames !== false);
     $('#rpg-cb-show-narrator-label').prop('checked', cbs.showNarratorLabel !== false);
     $('#rpg-cb-narrator-italic').prop('checked', cbs.narratorItalic !== false);
@@ -1110,6 +1111,10 @@ async function initUI() {
             el.classList.toggle('dooms-bubbles--no-avatars', !show);
         });
     });
+    $('#rpg-cb-skip-styled-divs').on('change', function () {
+        _cbSettings().skipStyledDivs = $(this).prop('checked');
+        _saveCbRerender();
+    });
     $('#rpg-cb-show-author-names').on('change', function () { _cbSettings().showAuthorNames = $(this).prop('checked'); _saveCbRerender(); });
     $('#rpg-cb-show-narrator-label').on('change', function () { _cbSettings().showNarratorLabel = $(this).prop('checked'); _saveCbRerender(); });
     $('#rpg-cb-narrator-italic').on('change', function () { _cbSettings().narratorItalic = $(this).prop('checked'); _saveCb(); });
@@ -1170,6 +1175,7 @@ async function initUI() {
             borderRadius: 6,
             spacing: 12,
             showAvatars: true,
+            skipStyledDivs: true,
             showAuthorNames: true,
             showNarratorLabel: true,
             narratorItalic: true,
@@ -1885,8 +1891,6 @@ async function initUI() {
         // upward-opening fly-out — i.e. closest to the D button.
         const buildAllMenuItems = () => {
             const items = [];
-            console.log('[FAB] buildAllMenuItems() starting');
-
             $('#top-settings-holder .drawer-icon').each(function () {
                 const $icon = $(this);
                 const label = ($icon.attr('title') || $icon.attr('aria-label') || 'Untitled').trim();
@@ -1902,8 +1906,6 @@ async function initUI() {
                 });
             });
 
-            console.log('[FAB] Found drawer icons:', items.length);
-
             items.push({
                 id: 'des-settings',
                 label: "Doom's Settings",
@@ -1911,7 +1913,6 @@ async function initUI() {
                 action: openSettingsDirect,
             });
 
-            console.log('[FAB] Final menu items:', items.map(i => i.label));
             return items;
         };
         const buildMenuItems = () => {

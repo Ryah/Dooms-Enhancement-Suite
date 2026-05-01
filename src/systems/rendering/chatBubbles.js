@@ -592,20 +592,126 @@ export function applyChatBubbles(messageElement, style) {
     const tempContainer = document.createElement('div');
     tempContainer.innerHTML = mesText.getAttribute('data-dooms-original-html');
 
-    // Find all divs with gradient backgrounds (GFX blocks)
-    // Find all divs that look like GFX blocks (styled divs with specific patterns)
-    const gfxDivs = Array.from(tempContainer.querySelectorAll('div[style*="background"], div[style*="border"], div[style*="padding"]')).filter(div => {
-        const style = div.getAttribute('style') || '';
-        // GFX blocks typically have multiple style properties
-        return (style.includes('background') || style.includes('color')) &&
-            (style.includes('padding') || style.includes('border') || style.includes('margin'));
-    });
+    const cbs = extensionSettings.chatBubbleSettings || {};
+    const skipStyledDivs = cbs.skipStyledDivs !== false;
 
-    console.log('[Dooms Chat Bubbles] Found', gfxDivs.length, 'GFX divs');
+    const childNodes = Array.from(tempContainer.childNodes);
+    const hasGfxMarkers = childNodes.some(node =>
+        node.nodeType === Node.COMMENT_NODE &&
+        /\bGFX_START\b/i.test(node.nodeValue || '')
+    );
 
-    // If no GFX blocks found, process normally
-    if (gfxDivs.length === 0) {
-        console.log('[Dooms Chat Bubbles] No GFX blocks found, processing normally');
+    // Split HTML into "html" and "gfx" parts.
+    // Primary signal: explicit <!-- GFX_START --> ... <!-- GFX_END --> markers.
+    // Fallback signal: style heuristic for presets that don't emit markers.
+    const parts = [];
+    const serializeNodes = (nodes) => {
+        const wrapper = document.createElement('div');
+        for (const node of nodes) {
+            wrapper.appendChild(node.cloneNode(true));
+        }
+        return wrapper.innerHTML;
+    };
+
+    if (hasGfxMarkers) {
+
+        let inGfxBlock = false;
+        let pendingNodes = [];
+        let gfxNodes = [];
+
+        const flushPending = () => {
+            if (pendingNodes.length === 0) return;
+            const html = serializeNodes(pendingNodes);
+            if (html.trim()) {
+                parts.push({ type: 'html', content: html });
+            }
+            pendingNodes = [];
+        };
+
+        const flushGfx = () => {
+            if (gfxNodes.length === 0) return;
+            const html = serializeNodes(gfxNodes);
+            if (html.trim()) {
+                parts.push({ type: 'gfx', content: html });
+            }
+            gfxNodes = [];
+        };
+
+        for (const node of childNodes) {
+            if (node.nodeType === Node.COMMENT_NODE) {
+                const comment = node.nodeValue || '';
+
+                if (/\bGFX_START\b/i.test(comment)) {
+                    flushPending();
+                    inGfxBlock = true;
+                    continue;
+                }
+
+                if (/\bGFX_END\b/i.test(comment)) {
+                    flushGfx();
+                    inGfxBlock = false;
+                    continue;
+                }
+            }
+
+            if (inGfxBlock) {
+                gfxNodes.push(node);
+            } else {
+                pendingNodes.push(node);
+            }
+        }
+
+        // Gracefully handle malformed input where GFX_END is missing.
+        if (inGfxBlock) {
+            flushGfx();
+        }
+        flushPending();
+    } else if (skipStyledDivs) {
+        // Fallback: detect likely GFX divs by inline style patterns.
+        const gfxDivs = Array.from(tempContainer.querySelectorAll('div[style*="background"], div[style*="border"], div[style*="padding"]')).filter(div => {
+            const style = div.getAttribute('style') || '';
+            return (style.includes('background') || style.includes('color')) &&
+                (style.includes('padding') || style.includes('border') || style.includes('margin'));
+        });
+
+        // If no GFX blocks found, process normally
+        if (gfxDivs.length === 0) {
+            const segments = parseMessageIntoBubbles(tempContainer);
+
+            const bubblesHtml = style === 'discord'
+                ? renderDiscordBubbles(segments)
+                : renderCardBubbles(segments);
+
+            const thoughts = mesText.querySelectorAll('.dooms-inline-thought');
+            const thoughtsHtml = Array.from(thoughts).map(t => t.outerHTML).join('');
+
+            mesText.innerHTML = bubblesHtml + thoughtsHtml;
+            return;
+        }
+
+        // Walk top-level child nodes so duplicate GFX div HTML is handled correctly.
+        const gfxDivSet = new Set(gfxDivs);
+        let pendingNodes = [];
+
+        const flushPending = () => {
+            if (pendingNodes.length === 0) return;
+            const html = serializeNodes(pendingNodes);
+            if (html.trim()) {
+                parts.push({ type: 'html', content: html });
+            }
+            pendingNodes = [];
+        };
+
+        for (const child of childNodes) {
+            if (gfxDivSet.has(child)) {
+                flushPending();
+                parts.push({ type: 'gfx', content: child.outerHTML });
+            } else {
+                pendingNodes.push(child);
+            }
+        }
+        flushPending();
+    } else {
         const segments = parseMessageIntoBubbles(tempContainer);
 
         const bubblesHtml = style === 'discord'
@@ -619,77 +725,15 @@ export function applyChatBubbles(messageElement, style) {
         return;
     }
 
-    // Split HTML around GFX blocks by finding their positions first
-    const parts = [];
-    let html = tempContainer.innerHTML;
-
-    // Build an array of {startIdx, endIdx, content} for each GFX block in original HTML
-    const gfxPositions = [];
-    for (const gfxDiv of gfxDivs) {
-        const gfxHtml = gfxDiv.outerHTML;
-        let searchStart = 0;
-        let idx = html.indexOf(gfxHtml, searchStart);
-
-        if (idx !== -1) {
-            gfxPositions.push({
-                startIdx: idx,
-                endIdx: idx + gfxHtml.length,
-                html: gfxHtml
-            });
-            searchStart = idx + 1;
-        }
-    }
-
-    // Sort by position
-    gfxPositions.sort((a, b) => a.startIdx - b.startIdx);
-
-    // Build parts array by walking through the HTML and inserting GFX blocks
-    let currentPos = 0;
-    for (const gfxPos of gfxPositions) {
-        // Add HTML before this GFX block
-        if (gfxPos.startIdx > currentPos) {
-            const beforeHtml = html.substring(currentPos, gfxPos.startIdx);
-            if (beforeHtml.trim()) {
-                parts.push({
-                    type: 'html',
-                    content: beforeHtml
-                });
-            }
-        }
-
-        // Add the GFX block itself
-        parts.push({
-            type: 'gfx',
-            content: gfxPos.html
-        });
-
-        currentPos = gfxPos.endIdx;
-    }
-
-    // Add any remaining HTML after the last GFX block
-    if (currentPos < html.length) {
-        const remainingHtml = html.substring(currentPos);
-        if (remainingHtml.trim()) {
-            parts.push({
-                type: 'html',
-                content: remainingHtml
-            });
-        }
-    }
-
-    console.log('[Dooms Chat Bubbles] Split into', parts.length, 'parts');
-
     // Process each part
     const finalParts = [];
 
     for (const part of parts) {
         if (part.type === 'gfx') {
             // GFX block: render as-is with NO bubble wrapper
-            console.log('[Dooms Chat Bubbles] Adding raw GFX block');
             finalParts.push(part.content);
         } else {
             // HTML section: apply bubbles
-            console.log('[Dooms Chat Bubbles] Processing HTML section for bubbles');
             const div = document.createElement('div');
             div.innerHTML = part.content;
             const segments = parseMessageIntoBubbles(div);
@@ -704,7 +748,6 @@ export function applyChatBubbles(messageElement, style) {
 
     // Combine all parts
     let finalHtml = finalParts.join('');
-    console.log('[Dooms Chat Bubbles] Final HTML assembled with', finalParts.length, 'parts');
 
     // Preserve inline thoughts
     const thoughts = mesText.querySelectorAll('.dooms-inline-thought');
