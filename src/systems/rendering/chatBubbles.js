@@ -560,6 +560,54 @@ function renderCardUserBubble(html) {
 /**
  * Apply chat bubble rendering to a single message element.
  */
+// export function applyChatBubbles(messageElement, style) {
+//     if (!style || style === 'off') return;
+
+//     const mesText = messageElement.querySelector('.mes_text');
+//     if (!mesText) return;
+
+//     const isUser = messageElement.getAttribute('is_user') === 'true';
+
+//     // Check if already processed with this style
+//     const currentStyle = mesText.getAttribute('data-dooms-bubbles-style');
+//     if (currentStyle === style) return;
+
+//     // If processed with a different style, revert first
+//     if (currentStyle) {
+//         revertSingleMessage(mesText);
+//     }
+
+//     // Store original HTML for clean revert
+//     if (!mesText.getAttribute('data-dooms-original-html')) {
+//         mesText.setAttribute('data-dooms-original-html', mesText.innerHTML);
+//     }
+
+//     mesText.setAttribute('data-dooms-bubbles-applied', 'true');
+//     mesText.setAttribute('data-dooms-bubbles-style', style);
+
+//     if (isUser) {
+//         mesText.innerHTML = style === 'discord'
+//             ? renderDiscordUserBubble(mesText.getAttribute('data-dooms-original-html'))
+//             : renderCardUserBubble(mesText.getAttribute('data-dooms-original-html'));
+//         return;
+//     }
+
+//     // Parse AI message into segments
+//     const tempDiv = document.createElement('div');
+//     tempDiv.innerHTML = mesText.getAttribute('data-dooms-original-html');
+//     const segments = parseMessageIntoBubbles(tempDiv);
+
+//     // Render bubbles
+//     const bubblesHtml = style === 'discord'
+//         ? renderDiscordBubbles(segments)
+//         : renderCardBubbles(segments);
+
+//     // Preserve inline thoughts that may have been appended
+//     const thoughts = mesText.querySelectorAll('.dooms-inline-thought');
+//     const thoughtsHtml = Array.from(thoughts).map(t => t.outerHTML).join('');
+
+//     mesText.innerHTML = bubblesHtml + thoughtsHtml;
+// }
 export function applyChatBubbles(messageElement, style) {
     if (!style || style === 'off') return;
 
@@ -592,21 +640,123 @@ export function applyChatBubbles(messageElement, style) {
         return;
     }
 
-    // Parse AI message into segments
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = mesText.getAttribute('data-dooms-original-html');
-    const segments = parseMessageIntoBubbles(tempDiv);
+    // Clone the original HTML to work with
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = mesText.getAttribute('data-dooms-original-html');
 
-    // Render bubbles
-    const bubblesHtml = style === 'discord'
-        ? renderDiscordBubbles(segments)
-        : renderCardBubbles(segments);
+    // Find all divs with gradient backgrounds (GFX blocks)
+    const gfxDivs = Array.from(tempContainer.querySelectorAll('div[style*="gradient"]'));
 
-    // Preserve inline thoughts that may have been appended
+    console.log('[Dooms Chat Bubbles] Found', gfxDivs.length, 'GFX divs');
+
+    // If no GFX blocks found, process normally
+    if (gfxDivs.length === 0) {
+        console.log('[Dooms Chat Bubbles] No GFX blocks found, processing normally');
+        const segments = parseMessageIntoBubbles(tempContainer);
+
+        const bubblesHtml = style === 'discord'
+            ? renderDiscordBubbles(segments)
+            : renderCardBubbles(segments);
+
+        const thoughts = mesText.querySelectorAll('.dooms-inline-thought');
+        const thoughtsHtml = Array.from(thoughts).map(t => t.outerHTML).join('');
+
+        mesText.innerHTML = bubblesHtml + thoughtsHtml;
+        return;
+    }
+
+    // Split HTML around GFX blocks by finding their positions first
+    const parts = [];
+    let html = tempContainer.innerHTML;
+
+    // Build an array of {startIdx, endIdx, content} for each GFX block in original HTML
+    const gfxPositions = [];
+    for (const gfxDiv of gfxDivs) {
+        const gfxHtml = gfxDiv.outerHTML;
+        let searchStart = 0;
+        let idx = html.indexOf(gfxHtml, searchStart);
+
+        if (idx !== -1) {
+            gfxPositions.push({
+                startIdx: idx,
+                endIdx: idx + gfxHtml.length,
+                html: gfxHtml
+            });
+            searchStart = idx + 1;
+        }
+    }
+
+    // Sort by position
+    gfxPositions.sort((a, b) => a.startIdx - b.startIdx);
+
+    // Build parts array by walking through the HTML and inserting GFX blocks
+    let currentPos = 0;
+    for (const gfxPos of gfxPositions) {
+        // Add HTML before this GFX block
+        if (gfxPos.startIdx > currentPos) {
+            const beforeHtml = html.substring(currentPos, gfxPos.startIdx);
+            if (beforeHtml.trim()) {
+                parts.push({
+                    type: 'html',
+                    content: beforeHtml
+                });
+            }
+        }
+
+        // Add the GFX block itself
+        parts.push({
+            type: 'gfx',
+            content: gfxPos.html
+        });
+
+        currentPos = gfxPos.endIdx;
+    }
+
+    // Add any remaining HTML after the last GFX block
+    if (currentPos < html.length) {
+        const remainingHtml = html.substring(currentPos);
+        if (remainingHtml.trim()) {
+            parts.push({
+                type: 'html',
+                content: remainingHtml
+            });
+        }
+    }
+
+    console.log('[Dooms Chat Bubbles] Split into', parts.length, 'parts');
+
+    // Process each part
+    const finalParts = [];
+
+    for (const part of parts) {
+        if (part.type === 'gfx') {
+            // GFX block: render as-is with NO bubble wrapper
+            console.log('[Dooms Chat Bubbles] Adding raw GFX block');
+            finalParts.push(part.content);
+        } else {
+            // HTML section: apply bubbles
+            console.log('[Dooms Chat Bubbles] Processing HTML section for bubbles');
+            const div = document.createElement('div');
+            div.innerHTML = part.content;
+            const segments = parseMessageIntoBubbles(div);
+
+            const bubblesHtml = style === 'discord'
+                ? renderDiscordBubbles(segments)
+                : renderCardBubbles(segments);
+
+            finalParts.push(bubblesHtml);
+        }
+    }
+
+    // Combine all parts
+    let finalHtml = finalParts.join('');
+    console.log('[Dooms Chat Bubbles] Final HTML assembled with', finalParts.length, 'parts');
+
+    // Preserve inline thoughts
     const thoughts = mesText.querySelectorAll('.dooms-inline-thought');
     const thoughtsHtml = Array.from(thoughts).map(t => t.outerHTML).join('');
 
-    mesText.innerHTML = bubblesHtml + thoughtsHtml;
+    mesText.innerHTML = finalHtml + thoughtsHtml;
 }
 
 /**
@@ -662,41 +812,41 @@ export function applyAllChatBubbles() {
 
     // Defer to next animation frame so we don't block the triggering event
     requestAnimationFrame(() => {
-    const viewTop = 0;
-    const viewBottom = window.innerHeight;
+        const viewTop = 0;
+        const viewBottom = window.innerHeight;
 
-    const deferred = [];
+        const deferred = [];
 
-    for (const msg of messages) {
-        const rect = msg.getBoundingClientRect();
-        // Visible (with generous margin) — apply now
-        if (rect.bottom >= viewTop - 200 && rect.top <= viewBottom + 200) {
-            applyChatBubbles(msg, style);
-        } else {
-            deferred.push(msg);
-        }
-    }
-
-    // Lazy-apply to off-screen messages as they scroll into view
-    if (deferred.length > 0) {
-        _bubbleObserver = new IntersectionObserver((entries, obs) => {
-            const currentStyle = extensionSettings.chatBubbleMode;
-            if (!currentStyle || currentStyle === 'off') {
-                obs.disconnect();
-                return;
+        for (const msg of messages) {
+            const rect = msg.getBoundingClientRect();
+            // Visible (with generous margin) — apply now
+            if (rect.bottom >= viewTop - 200 && rect.top <= viewBottom + 200) {
+                applyChatBubbles(msg, style);
+            } else {
+                deferred.push(msg);
             }
-            for (const entry of entries) {
-                if (entry.isIntersecting) {
-                    applyChatBubbles(entry.target, currentStyle);
-                    obs.unobserve(entry.target);
+        }
+
+        // Lazy-apply to off-screen messages as they scroll into view
+        if (deferred.length > 0) {
+            _bubbleObserver = new IntersectionObserver((entries, obs) => {
+                const currentStyle = extensionSettings.chatBubbleMode;
+                if (!currentStyle || currentStyle === 'off') {
+                    obs.disconnect();
+                    return;
                 }
-            }
-        }, { rootMargin: '300px 0px' });
+                for (const entry of entries) {
+                    if (entry.isIntersecting) {
+                        applyChatBubbles(entry.target, currentStyle);
+                        obs.unobserve(entry.target);
+                    }
+                }
+            }, { rootMargin: '300px 0px' });
 
-        for (const msg of deferred) {
-            _bubbleObserver.observe(msg);
+            for (const msg of deferred) {
+                _bubbleObserver.observe(msg);
+            }
         }
-    }
     }); // end requestAnimationFrame
 }
 
