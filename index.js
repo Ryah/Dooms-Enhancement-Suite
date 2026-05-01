@@ -1729,7 +1729,10 @@ async function initUI() {
         saveSettings();
     });
     const applyHideStTopBar = () => {
-        document.body.classList.toggle('dooms-hide-st-topbar', !!extensionSettings.fab.hideStTopBar);
+        const shouldHide = !!extensionSettings.fab.hideStTopBar;
+        document.body.classList.toggle('dooms-hide-st-topbar', shouldHide);
+        // Also hide TopInfoBar extension
+        $('#extensionTopBar').toggle(!shouldHide);
     };
     $('#rpg-toggle-hide-st-topbar').prop('checked', !!extensionSettings.fab.hideStTopBar);
     $('#rpg-toggle-hide-st-topbar').off('change.fab').on('change.fab', function () {
@@ -1902,12 +1905,17 @@ async function initUI() {
                     action: () => { $icon.trigger('click'); },
                 });
             });
+
+            console.log('[FAB] Found drawer icons:', items.length);
+
             items.push({
                 id: 'des-settings',
                 label: "Doom's Settings",
                 iconClass: 'fa-solid fa-gear',
                 action: openSettingsDirect,
             });
+
+            console.log('[FAB] Final menu items:', items.map(i => i.label));
             return items;
         };
         const buildMenuItems = () => {
