@@ -2016,37 +2016,57 @@ async function initUI() {
             const bareName = extensionName.replace(/^third-party\//, '');
             const selectedBranch = String($sel.val() || '').trim();
             const currentBranch = String($sel.data('currentBranch') || '').trim();
-            const remoteUrl = String($sel.data('remoteUrl') || '').trim();
             const switchingBranch = selectedBranch && currentBranch && selectedBranch !== currentBranch;
 
-            // Branch switch: use SillyTavern's install endpoint with a branch
-            // parameter — same path the Extensions panel's "Switch branch"
-            // button takes. Replaces the on-disk extension with the chosen
-            // branch's HEAD. Confirm first since this rewrites the folder.
+            // Branch switch: use SillyTavern's /api/extensions/switch endpoint
+            // — same path the Extensions panel's "Switch branch" button takes.
+            // /install hard-rejects with 409 "Directory already exists" when
+            // the folder is present (no force flag exists). /switch does a
+            // git checkout on the existing clone, creating a local tracking
+            // branch from origin/<branch> if needed. We bracket it with
+            // /update calls so the remote refs are fetched first (otherwise
+            // a freshly-pushed branch isn't visible to git checkout) and so
+            // the user lands on the latest commit of the new branch.
             if (switchingBranch) {
-                if (!remoteUrl) {
-                    throw new Error('Could not determine remote URL for branch switch.');
-                }
                 const ok = window.confirm(
                     `Switch to branch "${selectedBranch}"?\n\n` +
-                    `This re-installs Doom's Enhancement Suite from ${remoteUrl} on the "${selectedBranch}" branch.\n` +
-                    `Settings are kept; only the on-disk files are replaced.\n\n` +
+                    `This checks out the "${selectedBranch}" branch on your existing Doom's Enhancement Suite install.\n` +
+                    `Settings are kept; only the on-disk files change.\n\n` +
                     `(Same flow as SillyTavern's "Switch branch" button.)`
                 );
                 if (!ok) {
                     $status.html('<span style="opacity:0.8;">Switch cancelled.</span>');
                     return;
                 }
+                // Step 1: pull on the current branch so any newly-pushed
+                // remote branches are fetched into local refs.
+                $status.html('<span style="opacity:0.8;">Fetching latest refs…</span>');
+                try {
+                    await fetch('/api/extensions/update', {
+                        method: 'POST',
+                        headers: getRequestHeaders(),
+                        body: JSON.stringify({ extensionName: bareName, global: !isUserExt }),
+                    });
+                } catch (e) { /* best-effort fetch — don't abort if upstream pull fails */ }
+                // Step 2: checkout the target branch.
                 $status.html(`<span style="opacity:0.8;">Switching to <code>${selectedBranch}</code>…</span>`);
-                const resp = await fetch('/api/extensions/install', {
+                const switchResp = await fetch('/api/extensions/switch', {
                     method: 'POST',
                     headers: getRequestHeaders(),
-                    body: JSON.stringify({ url: remoteUrl, global: !isUserExt, branch: selectedBranch }),
+                    body: JSON.stringify({ extensionName: bareName, branch: selectedBranch, global: !isUserExt }),
                 });
-                if (!resp.ok) {
-                    const text = await resp.text().catch(() => '');
-                    throw new Error(text || `HTTP ${resp.status}`);
+                if (!switchResp.ok) {
+                    const text = await switchResp.text().catch(() => '');
+                    throw new Error(text || `HTTP ${switchResp.status}`);
                 }
+                // Step 3: pull on the new branch to land on its HEAD.
+                try {
+                    await fetch('/api/extensions/update', {
+                        method: 'POST',
+                        headers: getRequestHeaders(),
+                        body: JSON.stringify({ extensionName: bareName, global: !isUserExt }),
+                    });
+                } catch (e) { /* best-effort */ }
                 $status.html(`<i class="fa-solid fa-check" style="color:var(--rpg-highlight,#e94560);"></i> Switched to <code>${selectedBranch}</code>. <strong>Reload SillyTavern</strong> to apply.`);
                 $sel.data('currentBranch', selectedBranch);
                 return;
