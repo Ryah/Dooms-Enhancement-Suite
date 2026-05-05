@@ -2065,9 +2065,8 @@ async function initUI() {
             return;
         }
         const ok = window.confirm(
-            `Switch to branch "${selectedBranch}" and reload?\n\n` +
-            `This checks out the "${selectedBranch}" branch on your existing Doom's Enhancement Suite install, then reloads SillyTavern so the new code runs.\n\n` +
-            `Settings are kept; only on-disk files change.`
+            `Switch Doom's Enhancement Suite to the "${selectedBranch}" branch?\n\n` +
+            `SillyTavern will reload after switching. Your settings, characters, and chats won't be affected — only the extension's code is replaced.`
         );
         if (!ok) {
             $status.html('<span style="opacity:0.8;">Switch cancelled.</span>');
@@ -2089,15 +2088,34 @@ async function initUI() {
                 });
             } catch (e) { /* best-effort */ }
             // Step 2: checkout the target branch via /api/extensions/switch.
+            // First attempt with the bare branch name (works when a local
+            // tracking branch already exists from a prior switch). If ST
+            // responds with "does not exist locally" (typical for branches
+            // the user has never switched to before — e.g. blades-in-the-
+            // dark on a fresh main install), retry with the `origin/`
+            // prefix, which tells ST to create a local tracking branch
+            // from the remote ref. This mirrors ST's own "Switch branch"
+            // button which always passes the remote-prefixed form.
             $status.html(`<span style="opacity:0.8;">Switching to <code>${selectedBranch}</code>…</span>`);
-            const switchResp = await fetch('/api/extensions/switch', {
+            const trySwitch = async (branchName) => fetch('/api/extensions/switch', {
                 method: 'POST',
                 headers: getRequestHeaders(),
-                body: JSON.stringify({ extensionName: bareName, branch: selectedBranch, global: !isUserExt }),
+                body: JSON.stringify({ extensionName: bareName, branch: branchName, global: !isUserExt }),
             });
+            let switchResp = await trySwitch(selectedBranch);
             if (!switchResp.ok) {
-                const text = await switchResp.text().catch(() => '');
-                throw new Error(text || `HTTP ${switchResp.status}`);
+                const firstErr = await switchResp.text().catch(() => '');
+                // Heuristic: if ST tells us the local branch doesn't
+                // exist, retry with origin/ prefix. Match liberally —
+                // ST's exact wording can vary across versions.
+                if (/does not exist|not found|unknown branch/i.test(firstErr)) {
+                    $status.html(`<span style="opacity:0.8;">Creating local tracking branch for <code>${selectedBranch}</code>…</span>`);
+                    switchResp = await trySwitch(`origin/${selectedBranch}`);
+                }
+                if (!switchResp.ok) {
+                    const finalErr = await switchResp.text().catch(() => firstErr);
+                    throw new Error(finalErr || `HTTP ${switchResp.status}`);
+                }
             }
             // Step 3: pull on the new branch to land on its HEAD.
             try {

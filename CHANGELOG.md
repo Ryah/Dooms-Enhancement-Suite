@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.5] - 2026-05-05
+
+### Fixed
+- **Switch & Reload failed for branches you'd never visited before** with `does not exist locally`. `/api/extensions/switch` requires either a local branch or a `origin/<name>`-prefixed remote ref. We were always passing the bare name, which only works for branches that already exist as local tracking branches. The handler now tries the bare name first (covers the common case where the user has switched to that branch before) and on a "does not exist" / "not found" / "unknown branch" response automatically retries with `origin/<name>`, which makes ST create the local tracking branch from the remote ref. Mirrors how ST's own Extensions panel "Switch branch" button works.
+- **Switch confirmation popup language was technical and confusing.** Replaced "checks out the branch on your existing install / on-disk files change" jargon with "Switch Doom's Enhancement Suite to the X branch? SillyTavern will reload after switching. Your settings, characters, and chats won't be affected — only the extension's code is replaced."
+
 ## [1.10.4] - 2026-05-05
 
 ### Fixed
