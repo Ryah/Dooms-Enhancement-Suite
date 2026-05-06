@@ -130,6 +130,7 @@ import {
     onMessageReceived,
     onCharacterChanged,
     onMessageSwiped,
+    onMessageDeleted,
     updatePersonaAvatar,
     clearExtensionPrompts,
     onGenerationEnded,
@@ -143,7 +144,8 @@ import {
     onExpressionSyncSettingChanged,
     onHideDefaultExpressionDisplaySettingChanged,
     clearExpressionSyncCache,
-    onExpressionSyncChatChanged
+    onExpressionSyncChatChanged,
+    classifyActiveUserExpression,
 } from './src/systems/integration/expressionSync.js';
 // Doom Counter
 import { triggerDoomCounter, updateDoomCounterUI, resetCounters, isTrapTwistPending, clearTrapTwistFlag } from './src/systems/generation/doomCounter.js';
@@ -282,10 +284,191 @@ function updateGenerationModeUI() {
     }
 }
 /**
+ * Resolve the currently-active user character name. Manual override
+ * (extensionSettings.activeUserCharacter) wins; otherwise auto-match
+ * via linkedPersona == window.user_avatar; final fallback is the only
+ * user character if exactly one exists. Returns null if none.
+ */
+function resolveActiveUserCharacterName() {
+    const s = extensionSettings;
+    if (!s || !s.userCharacters || typeof s.userCharacters !== 'object') return null;
+    if (s.activeUserCharacter && s.userCharacters[s.activeUserCharacter]) return s.activeUserCharacter;
+    let currentAvatar = '';
+    try { currentAvatar = (typeof window !== 'undefined' && window.user_avatar) || ''; } catch (e) {}
+    if (currentAvatar) {
+        for (const [n, entry] of Object.entries(s.userCharacters)) {
+            if (entry && entry.linkedPersona === currentAvatar) return n;
+        }
+    }
+    const allNames = Object.keys(s.userCharacters);
+    if (allNames.length === 1) return allNames[0];
+    return null;
+}
+
+/**
+ * If "Show User in PCP" is on AND the active user character has a color,
+ * return that color (it overrides chatBubbleSettings.userDialogColor).
+ * Returns null otherwise.
+ */
+function getOverridingUserDialogColor() {
+    const s = extensionSettings;
+    if (!s || !s.showUserInPCP) return null;
+    const name = resolveActiveUserCharacterName();
+    if (!name) return null;
+    const entry = s.userCharacters && s.userCharacters[name];
+    return (entry && entry.color) ? entry.color : null;
+}
+
+/**
+ * Toggle the User Dialog color picker between editable and "controlled
+ * by user character settings" modes. No-ops gracefully if the picker
+ * isn't present (e.g. a build that hasn't shipped the picker yet).
+ */
+function updateUserDialogOverrideUI() {
+    const $picker = $('#rpg-cb-user-color');
+    if (!$picker.length) return;
+    const $row = $picker.closest('.rpg-setting-row');
+    const overrideColor = getOverridingUserDialogColor();
+    if (overrideColor) {
+        $picker.prop('disabled', true).val(overrideColor);
+        let $note = $row.find('.rpg-cb-user-override-note');
+        if (!$note.length) {
+            $note = $('<span class="rpg-cb-user-override-note rpg-setting-hint" style="display:block; margin-top:4px; font-style: italic; color: var(--rpg-highlight, #e94560); opacity: 0.85;"><i class="fa-solid fa-link"></i> Controlled by user character settings</span>');
+            $row.append($note);
+        }
+        $note.show();
+    } else {
+        $picker.prop('disabled', false);
+        $row.find('.rpg-cb-user-override-note').hide();
+    }
+}
+
+/**
+ * Populates the Update-section branch dropdown by mirroring SillyTavern's
+ * own "Switch branch" button flow:
+ *   1. POST /api/extensions/version — read current branch + remoteUrl
+ *   2. If the response includes a branches list, use it directly.
+ *      Otherwise pull branches from GitHub via the response's remoteUrl.
+ *   3. Cache for the lifetime of the page so reopening the settings doesn't
+ *      re-hit the network. Falls back to ["main"] on total failure.
+ */
+let _branchListPromise = null;
+function populateUpdateBranchDropdownOnce() {
+    const $sel = $('#rpg-update-branch');
+    if (!$sel.length) return;
+    if ($sel.data('populated')) return;
+    if (_branchListPromise) {
+        _branchListPromise.then((info) => fillBranchDropdown(info)).catch(() => {});
+        return;
+    }
+    _branchListPromise = (async () => {
+        const isUserExt = (import.meta.url || '').includes('/data/');
+        const bareName = extensionName.replace(/^third-party\//, '');
+        let currentBranch = '';
+        let remoteUrl = '';
+        let branches = [];
+        // 1. Ask SillyTavern for its view of this extension's git state.
+        try {
+            const resp = await fetch('/api/extensions/version', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({ extensionName: bareName, global: !isUserExt }),
+            });
+            if (resp.ok) {
+                const data = await resp.json().catch(() => ({}));
+                currentBranch = String(data?.currentBranchName || data?.currentBranch || '').trim();
+                remoteUrl = String(data?.remoteUrl || data?.remote || '').trim();
+                if (Array.isArray(data?.branches)) {
+                    branches = data.branches.map(b => typeof b === 'string' ? b : String(b?.name || '')).filter(Boolean);
+                }
+            }
+        } catch (e) { /* fall through to manifest+GitHub */ }
+        // 2. If we don't have a branches list yet, fetch from GitHub. Pull
+        //    the repo slug from remoteUrl (preferred, matches what ST sees)
+        //    or from manifest.homePage as a fallback.
+        if (!branches.length) {
+            let repoSlug = '';
+            const fromRemote = remoteUrl.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?\/?$/);
+            if (fromRemote) repoSlug = fromRemote[1];
+            if (!repoSlug) {
+                try {
+                    const manifestResp = await fetch(`/${extensionFolderPath}/manifest.json`, { cache: 'no-cache' });
+                    if (manifestResp.ok) {
+                        const manifest = await manifestResp.json();
+                        const m = String(manifest.homePage || '').match(/github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
+                        if (m) repoSlug = m[1];
+                        if (!remoteUrl) remoteUrl = manifest.homePage || '';
+                    }
+                } catch (e) { /* keep fallback */ }
+            }
+            if (!repoSlug) repoSlug = 'DangerDaza/Dooms-Enhancement-Suite';
+            try {
+                const ghResp = await fetch(`https://api.github.com/repos/${repoSlug}/branches?per_page=100`, {
+                    headers: { 'Accept': 'application/vnd.github+json' },
+                });
+                if (ghResp.ok) {
+                    const data = await ghResp.json();
+                    if (Array.isArray(data)) {
+                        branches = data.map(b => String(b?.name || '')).filter(Boolean);
+                    }
+                }
+            } catch (e) { /* fall through to ["main"] */ }
+        }
+        if (!branches.length) branches = ['main'];
+        return { branches, currentBranch, remoteUrl };
+    })();
+    _branchListPromise
+        .then((info) => fillBranchDropdown(info))
+        .catch((err) => {
+            console.warn('[Dooms Tracker] Failed to populate branch dropdown:', err);
+            fillBranchDropdown({ branches: ['main'], currentBranch: '', remoteUrl: '' });
+        });
+}
+
+function fillBranchDropdown({ branches, currentBranch, remoteUrl }) {
+    const $sel = $('#rpg-update-branch');
+    if (!$sel.length) return;
+    // No whitelist — expose every branch the API returned. Sort: current
+    // branch first (so users instantly see what they're on), then main /
+    // master next as the canonical release lines, then every other branch
+    // alphabetical.
+    const ordered = [...branches].sort((a, b) => {
+        if (currentBranch) {
+            if (a === currentBranch) return -1;
+            if (b === currentBranch) return 1;
+        }
+        const wa = a === 'main' ? 0 : a === 'master' ? 1 : 2;
+        const wb = b === 'main' ? 0 : b === 'master' ? 1 : 2;
+        return wa !== wb ? wa - wb : a.localeCompare(b);
+    });
+    const previous = String($sel.val() || '');
+    $sel.empty();
+    for (const name of ordered) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = (currentBranch && name === currentBranch) ? `${name} (current)` : name;
+        $sel[0].appendChild(opt);
+    }
+    if (previous && ordered.includes(previous)) {
+        $sel.val(previous);
+    } else if (currentBranch && ordered.includes(currentBranch)) {
+        $sel.val(currentBranch);
+    } else {
+        $sel.val(ordered[0] || '');
+    }
+    $sel.data('populated', true);
+    $sel.data('currentBranch', currentBranch || '');
+    $sel.data('remoteUrl', remoteUrl || '');
+}
+
+/**
  * Populates all Chat Bubbles & Info Panel settings controls from saved state.
  */
 function loadChatBubbleSettingsUI() {
     const cbs = extensionSettings.chatBubbleSettings || {};
+    // Refresh the User Dialog override indicator (paired with the
+    // "Show User in PCP" toggle and the active user character's color).
+    try { updateUserDialogOverrideUI(); } catch (e) {}
 
     // Mode selectors
     $('#rpg-cb-bubble-mode').val(extensionSettings.chatBubbleMode || 'off');
@@ -471,6 +654,14 @@ async function initUI() {
     // Layout toggles
     $('#rpg-pb-show-header').on('change', function () { _pbSettings().showHeader = $(this).prop('checked'); _savePb(); });
     $('#rpg-pb-show-absent').on('change', function () { _pbSettings().showAbsentCharacters = $(this).prop('checked'); _savePb(); updatePortraitBar(); });
+    $('#rpg-pb-show-user').on('change', function () {
+        extensionSettings.showUserInPCP = $(this).prop('checked');
+        saveSettings();
+        try { updatePortraitBar(); } catch (e) {}
+        // Also re-paint the bubble settings indicator (toggle drives whether
+        // the user-character color overrides chatBubbleSettings.userDialogColor).
+        try { updateUserDialogOverrideUI(); } catch (e) {}
+    });
     $('#rpg-pb-show-arrows').on('change', function () { _pbSettings().showScrollArrows = $(this).prop('checked'); _savePb(); });
     $('#rpg-pb-auto-import').on('change', function () { extensionSettings.portraitAutoImport = $(this).prop('checked'); saveSettings(); });
 
@@ -549,8 +740,32 @@ async function initUI() {
         e.preventDefault(); e.stopPropagation();
         const $popup = $('#rpg-expressions-info-popup');
         const open = $popup.prop('hidden');
+        if (open) {
+            // Switch to position:fixed anchored to the button so the popup
+            // escapes any clipping by the accordion-body or other ancestor
+            // overflow rules. Right-align under the button; clamp to viewport.
+            const rect = this.getBoundingClientRect();
+            const popupWidth = Math.min(420, window.innerWidth - 16);
+            const rightOffset = Math.max(8, window.innerWidth - rect.right);
+            $popup.css({
+                position: 'fixed',
+                top: (rect.bottom + 6) + 'px',
+                right: rightOffset + 'px',
+                left: 'auto',
+                width: popupWidth + 'px',
+                'max-height': 'calc(100vh - ' + (rect.bottom + 24) + 'px)',
+                'overflow-y': 'auto',
+                'z-index': 1000,
+            });
+        }
         $popup.prop('hidden', !open);
         $(this).attr('aria-expanded', open ? 'true' : 'false');
+    });
+    // Popup body clicks shouldn't bubble — when the info popup is rendered
+    // inside a <summary> (collapsible subsection header), the click would
+    // otherwise toggle the surrounding <details>.
+    $(document).on('click', '#rpg-expressions-info-popup', function (e) {
+        e.stopPropagation();
     });
     $(document).on('click', function (e) {
         const $popup = $('#rpg-expressions-info-popup');
@@ -1525,6 +1740,7 @@ async function initUI() {
     $('#rpg-pb-badge').text((extensionSettings.showPortraitBar ?? true) ? 'on' : 'off');
     $('#rpg-pb-show-header').prop('checked', pb.showHeader !== false);
     $('#rpg-pb-show-absent').prop('checked', pb.showAbsentCharacters !== false);
+    $('#rpg-pb-show-user').prop('checked', extensionSettings.showUserInPCP === true);
     $('#rpg-pb-show-arrows').prop('checked', pb.showScrollArrows !== false);
     $('#rpg-pb-auto-import').prop('checked', extensionSettings.portraitAutoImport !== false);
     $('#rpg-pb-sync-expressions').prop('checked', extensionSettings.syncExpressionsToPresentCharacters === true);
@@ -1537,7 +1753,14 @@ async function initUI() {
     // Hide the 'Open Character Roster' settings button when PCP is off —
     // the Workshop is part of the Present Characters Panel feature set.
     $('#rpg-open-character-roster').toggle(extensionSettings.showPortraitBar !== false);
-    $('#rpg-pb-per-chat-tracking').prop('checked', extensionSettings.perChatCharacterTracking === true);
+    // Per-chat character tracking is always on now; force the setting
+    // and the (hidden) toggle to true so legacy users with it off are
+    // migrated and any code reading the toggle still gets a truthy value.
+    if (extensionSettings.perChatCharacterTracking !== true) {
+        extensionSettings.perChatCharacterTracking = true;
+        try { saveSettings(); } catch (e) {}
+    }
+    $('#rpg-pb-per-chat-tracking').prop('checked', true);
     $('#rpg-pb-card-width').val(pb.cardWidth ?? 110);
     $('#rpg-pb-card-width-value').text((pb.cardWidth ?? 110) + 'px');
     $('#rpg-pb-card-height').val(pb.cardHeight ?? 150);
@@ -1771,6 +1994,16 @@ async function initUI() {
     getExtensionVersion().then(v => {
         if (v) $('#rpg-current-version').text(`Currently v${v}.`);
     });
+    // Fetch branches from GitHub and populate the dropdown. Best-effort —
+    // failures fall back to a static "main" entry.
+    populateUpdateBranchDropdownOnce();
+    // Update Extension button — git pull on the currently checked-out
+    // branch only. Branch switching is handled by the separate Switch &
+    // Reload button below; mixing the two into one button left users
+    // confused about whether picking a different branch in the dropdown
+    // before clicking Update would actually switch (it used to, but
+    // hiding that behavior behind the same button as "pull current"
+    // wasn't discoverable).
     $('#rpg-update-extension').off('click.upd').on('click.upd', async function () {
         const $btn = $(this);
         if ($btn.prop('disabled')) return;
@@ -1804,6 +2037,106 @@ async function initUI() {
             console.error('[Dooms Tracker] Update failed:', err);
             $status.html(`<i class="fa-solid fa-triangle-exclamation" style="color:#e94560;"></i> Update failed: ${err.message || err}`);
         } finally {
+            $btn.prop('disabled', false).html(originalHtml);
+        }
+    });
+
+    // Switch & Reload button — checks out whatever branch is selected in
+    // the dropdown via /api/extensions/switch (the same endpoint ST's
+    // own "Switch branch" button uses), then reloads the page so the
+    // freshly-checked-out JS actually executes. Without the auto-reload
+    // users were ending up on the new branch on disk but still running
+    // the old extension code in the browser — leading to "I switched
+    // and it says I'm still on main" reports.
+    $('#rpg-switch-branch').off('click.swb').on('click.swb', async function () {
+        const $btn = $(this);
+        if ($btn.prop('disabled')) return;
+        const $status = $('#rpg-update-status');
+        const $sel = $('#rpg-update-branch');
+        const originalHtml = $btn.html();
+        const selectedBranch = String($sel.val() || '').trim();
+        const currentBranch = String($sel.data('currentBranch') || '').trim();
+        if (!selectedBranch) {
+            $status.html('<span style="opacity:0.8;">Pick a branch first.</span>');
+            return;
+        }
+        if (currentBranch && selectedBranch === currentBranch) {
+            $status.html(`<span style="opacity:0.8;">Already on <code>${selectedBranch}</code>. Use Update Extension to pull the latest commit.</span>`);
+            return;
+        }
+        const ok = window.confirm(
+            `Switch Doom's Enhancement Suite to the "${selectedBranch}" branch?\n\n` +
+            `SillyTavern will reload after switching. Your settings, characters, and chats won't be affected — only the extension's code is replaced.`
+        );
+        if (!ok) {
+            $status.html('<span style="opacity:0.8;">Switch cancelled.</span>');
+            return;
+        }
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Switching…');
+        try {
+            const isUserExt = (import.meta.url || '').includes('/data/');
+            const bareName = extensionName.replace(/^third-party\//, '');
+            // Step 1: pull on the current branch so freshly-pushed
+            // remote branches are fetched into local refs (best-effort —
+            // a stale upstream shouldn't block the user from switching).
+            $status.html('<span style="opacity:0.8;">Fetching latest refs…</span>');
+            try {
+                await fetch('/api/extensions/update', {
+                    method: 'POST',
+                    headers: getRequestHeaders(),
+                    body: JSON.stringify({ extensionName: bareName, global: !isUserExt }),
+                });
+            } catch (e) { /* best-effort */ }
+            // Step 2: checkout the target branch via /api/extensions/switch.
+            // First attempt with the bare branch name (works when a local
+            // tracking branch already exists from a prior switch). If ST
+            // responds with "does not exist locally" (typical for branches
+            // the user has never switched to before — e.g. blades-in-the-
+            // dark on a fresh main install), retry with the `origin/`
+            // prefix, which tells ST to create a local tracking branch
+            // from the remote ref. This mirrors ST's own "Switch branch"
+            // button which always passes the remote-prefixed form.
+            $status.html(`<span style="opacity:0.8;">Switching to <code>${selectedBranch}</code>…</span>`);
+            const trySwitch = async (branchName) => fetch('/api/extensions/switch', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({ extensionName: bareName, branch: branchName, global: !isUserExt }),
+            });
+            let switchResp = await trySwitch(selectedBranch);
+            if (!switchResp.ok) {
+                const firstErr = await switchResp.text().catch(() => '');
+                // Heuristic: if ST tells us the local branch doesn't
+                // exist, retry with origin/ prefix. Match liberally —
+                // ST's exact wording can vary across versions.
+                if (/does not exist|not found|unknown branch/i.test(firstErr)) {
+                    $status.html(`<span style="opacity:0.8;">Creating local tracking branch for <code>${selectedBranch}</code>…</span>`);
+                    switchResp = await trySwitch(`origin/${selectedBranch}`);
+                }
+                if (!switchResp.ok) {
+                    const finalErr = await switchResp.text().catch(() => firstErr);
+                    throw new Error(finalErr || `HTTP ${switchResp.status}`);
+                }
+            }
+            // Step 3: pull on the new branch to land on its HEAD.
+            try {
+                await fetch('/api/extensions/update', {
+                    method: 'POST',
+                    headers: getRequestHeaders(),
+                    body: JSON.stringify({ extensionName: bareName, global: !isUserExt }),
+                });
+            } catch (e) { /* best-effort */ }
+            $sel.data('currentBranch', selectedBranch);
+            $status.html(`<i class="fa-solid fa-check" style="color:var(--rpg-highlight,#e94560);"></i> Switched to <code>${selectedBranch}</code>. Reloading…`);
+            $btn.html('<i class="fa-solid fa-rotate fa-spin"></i> Reloading…');
+            // Brief delay so the success state is visible before the
+            // page disappears, then hard-reload to bring up the new
+            // branch's JS. location.reload(true) is deprecated; the
+            // bare reload() in modern browsers does a normal reload
+            // which is enough since switch wrote new files to disk.
+            setTimeout(() => { try { window.location.reload(); } catch (e) { /* fallback */ } }, 1200);
+        } catch (err) {
+            console.error('[Dooms Tracker] Branch switch failed:', err);
+            $status.html(`<i class="fa-solid fa-triangle-exclamation" style="color:#e94560;"></i> Switch failed: ${err.message || err}`);
             $btn.prop('disabled', false).html(originalHtml);
         }
     });
@@ -1906,6 +2239,22 @@ async function initUI() {
                 });
             });
 
+            items.push({
+                id: 'character-roster',
+                label: 'Workshop',
+                iconClass: 'fa-solid fa-users-rectangle',
+                action: () => {
+                    // Prefer the decoupled event used by other surfaces;
+                    // fall back to a click on the settings entry button if
+                    // the listener hasn't been registered yet.
+                    try {
+                        window.dispatchEvent(new CustomEvent('dooms:open-roster'));
+                    } catch (e) {
+                        const $btn = $('#rpg-open-character-roster');
+                        if ($btn.length) $btn.trigger('click');
+                    }
+                },
+            });
             items.push({
                 id: 'des-settings',
                 label: "Doom's Settings",
@@ -2525,10 +2874,28 @@ jQuery(async () => {
             });
             eventSource.on(event_types.USER_MESSAGE_RENDERED, (messageId) => {
                 if (!extensionSettings.enabled) return;
-                if (!extensionSettings.chatBubbleMode || extensionSettings.chatBubbleMode === 'off') return;
-                const messageElement = document.querySelector(`#chat .mes[mesid="${messageId}"]`);
-                if (messageElement) {
-                    applyChatBubbles(messageElement, extensionSettings.chatBubbleMode);
+                // Chat bubbles styling
+                if (extensionSettings.chatBubbleMode && extensionSettings.chatBubbleMode !== 'off') {
+                    const messageElement = document.querySelector(`#chat .mes[mesid="${messageId}"]`);
+                    if (messageElement) {
+                        applyChatBubbles(messageElement, extensionSettings.chatBubbleMode);
+                    }
+                }
+                // User-character expression classification — same flow {{char}}
+                // gets after each AI reply, but on the user's outgoing text.
+                // Gated by syncExpressionsToPresentCharacters and a configured
+                // active user character with a sprite folder; otherwise no-op.
+                if (extensionSettings.syncExpressionsToPresentCharacters) {
+                    try {
+                        const idx = parseInt(messageId, 10);
+                        const msg = (Array.isArray(chat) && Number.isFinite(idx)) ? chat[idx] : null;
+                        const text = msg && msg.is_user ? (msg.mes || '') : '';
+                        if (text) {
+                            classifyActiveUserExpression(text)
+                                .then(() => updatePortraitBar())
+                                .catch(err => console.error('[DES] User expression classify failed:', err));
+                        }
+                    } catch (e) {}
                 }
             });
             eventSource.on(event_types.CHAT_CHANGED, () => {
@@ -2580,10 +2947,20 @@ jQuery(async () => {
                 }
             });
             // MESSAGE_DELETED does not fire the same render/update hooks as swipes or edits.
-            // Reset Doom's transient expression-sync state so the observer doesn't keep
-            // attributing later ST expression changes to the speaker of the deleted message.
+            // Two things to do when a message is removed:
+            //   1. Roll the tracker panels (quests / info / thoughts / portrait /
+            //      weather / scene header) back to the new last assistant message's
+            //      stored swipe data, so DES isn't showing context that referred to
+            //      a turn the user just deleted. Also resets committedTrackerData so
+            //      the next generation runs with the correct prior state.
+            //   2. Reset transient expression-sync state so the observer doesn't keep
+            //      attributing later ST expression changes to the speaker of the
+            //      deleted message.
             eventSource.on(event_types.MESSAGE_DELETED, () => {
                 if (!extensionSettings.enabled) return;
+                try { onMessageDeleted(); } catch (e) {
+                    console.warn('[Dooms Tracker] onMessageDeleted failed:', e);
+                }
                 clearExpressionSyncCache();
                 setTimeout(() => onExpressionSyncChatChanged(), 0);
             });
